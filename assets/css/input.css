@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@source "../../templates/**/*.html";
+@source "../../credit_applications/**/*.py";
+
+@theme {
+  --font-sans: Arial, "Helvetica Neue", sans-serif;
+  --color-brand-50: #fff1f0;
+  --color-brand-100: #ffe2df;
+  --color-brand-500: #ef3124;
+  --color-brand-600: #d9271c;
+  --color-ink-950: #07101f;
+  --color-ink-700: #384456;
+  --color-ink-500: #687386;
+  --color-canvas: #f3f5f7;
+  --color-line: #e2e6ea;
+}
+
+@layer base {
+  html { background: #f3f5f7; }
+  body { min-width: 320px; }
+  button, a, input, textarea { -webkit-tap-highlight-color: transparent; }
+}
+

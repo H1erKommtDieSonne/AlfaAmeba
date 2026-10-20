@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Новая заявка · Альфа-Банк Бизнес{% endblock %}
+{% block content %}
+<main class="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:py-10" x-data="{ product: '{{ form.product.value|default:'working-capital' }}', showHint: true, submitting: false }">
+  <div class="mb-8 flex items-center justify-between gap-6">
+    <a href="#" onclick="history.back(); return false" class="flex items-center gap-2 text-[12px] font-medium text-ink-500 hover:text-ink-950"><span class="text-lg">‹</span> Назад</a>
+    <ol class="hidden flex-1 items-center justify-center gap-4 text-[11px] md:flex" aria-label="Этапы заявки">
+      <li class="flex items-center gap-2 font-semibold text-ink-950"><span class="grid size-7 place-items-center rounded-full bg-brand-500 text-white">1</span>О компании</li><li class="h-px w-12 border-t border-dashed border-[#c7ced6]"></li>
+      <li class="flex items-center gap-2 text-ink-500"><span class="grid size-7 place-items-center rounded-full bg-[#e7eaee]">2</span>Параметры кредита</li><li class="h-px w-12 border-t border-dashed border-[#c7ced6]"></li>
+      <li class="flex items-center gap-2 text-ink-500"><span class="grid size-7 place-items-center rounded-full bg-[#e7eaee]">3</span>Документы</li><li class="h-px w-12 border-t border-dashed border-[#c7ced6]"></li>
+      <li class="flex items-center gap-2 text-ink-500"><span class="grid size-7 place-items-center rounded-full bg-[#e7eaee]">4</span>Отправка</li>
+    </ol>
+    <span class="hidden items-center gap-2 text-[11px] text-ink-500 sm:flex"><svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current" stroke-width="1.7"><path d="M7 3h7l4 4v14H7zM14 3v5h5"/></svg>Черновик сохраняется после отправки</span>
+  </div>
+
+  <div class="mx-auto max-w-[1060px]">
+    <div class="mb-6"><h1 class="text-[30px] font-bold tracking-[-.035em]">Расскажите о вашей компании</h1><p class="mt-2 text-sm text-ink-500">Эти данные помогут подобрать подходящее предложение</p></div>
+    <form method="post" @submit="submitting = true" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="mb-5 rounded-[10px] bg-brand-50 px-4 py-3 text-[12px] text-brand-600">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="grid gap-4 lg:grid-cols-[1fr_300px]">
+        <div class="space-y-4">
+          <section class="rounded-2xl border border-line bg-white p-5 sm:p-6">
+            <div class="mb-5 flex items-center justify-between"><h2 class="text-[15px] font-bold">Основная информация</h2><span class="text-[10px] text-ink-500">Все поля обязательны</span></div>
+            <div class="grid gap-5 sm:grid-cols-2">
+              {% include "credit_applications/field.html" with field=form.inn %}
+              {% include "credit_applications/field.html" with field=form.organization_name %}
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-line bg-white p-5 sm:p-6">
+            <h2 class="text-[15px] font-bold">Параметры кредита</h2>
+            <fieldset class="mt-5">
+              <legend class="mb-3 text-[12px] font-medium text-ink-700">Выберите продукт</legend>
+              {% if form.product.errors %}<p class="mb-2 text-[11px] text-brand-500">{{ form.product.errors|striptags }}</p>{% endif %}
+              <div class="grid gap-3 sm:grid-cols-2">
+                {% for choice in form.product.field.queryset %}
+                <label class="relative cursor-pointer rounded-xl border p-4 transition" :class="product === '{{ choice.pk }}' ? 'border-brand-500 bg-brand-50/60 ring-1 ring-brand-500' : 'border-line hover:border-[#b8c0c9]'">
+                  <input class="sr-only" type="radio" name="product" value="{{ choice.pk }}" x-model="product" {% if form.product.value == choice.pk or not form.is_bound and choice.code == 'working-capital' %}checked{% endif %}>
+                  <div class="flex items-start justify-between gap-3"><span class="grid size-9 place-items-center rounded-[10px] bg-canvas text-ink-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.6"><path d="M5 8h14v11H5zM8 8V5h8v3M9 13h6"/></svg></span><span class="rounded-md bg-[#eef1f4] px-2 py-1 text-[9px] font-semibold text-ink-500">{{ choice.badge }}</span></div>
+                  <strong class="mt-4 block text-[13px]">{{ choice.name }}</strong><small class="mt-1 block text-[11px] leading-4 text-ink-500">{{ choice.description }}</small>
+                </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <div class="mt-5 grid gap-5 sm:grid-cols-2">{% include "credit_applications/field.html" with field=form.amount %}{% include "credit_applications/field.html" with field=form.term_months %}</div>
+            <div class="mt-5">{% include "credit_applications/field.html" with field=form.purpose %}</div>
+          </section>
+        </div>
+
+        <aside class="space-y-3">
+          <section x-show="showHint" x-transition class="rounded-2xl border border-line bg-white p-5">
+            <div class="flex gap-3"><span class="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><path d="M9 18h6M10 22h4M8 14c-1.2-1-2-2.6-2-4.5a6 6 0 1 1 12 0c0 1.9-.8 3.5-2 4.5-.7.6-1 1.2-1 2H9c0-.8-.3-1.4-1-2Z"/></svg></span><div><h3 class="text-[12px] font-bold">Подсказка</h3><p class="mt-1 text-[11px] leading-[1.55] text-ink-500">Чем точнее вы заполните данные, тем быстрее банк сможет проверить заявку.</p></div><button type="button" @click="showHint=false" class="ml-auto self-start text-ink-500">×</button></div>
+          </section>
+          <section class="rounded-2xl border border-line bg-white p-5">
+            <div class="flex gap-3"><span class="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 12h5M10 16h5"/></svg></span><div><h3 class="text-[12px] font-bold">Нужно подготовить</h3><ul class="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-4 text-ink-500"><li>Выписку по расчётному счёту</li><li>Бухгалтерскую отчётность</li><li>Данные руководителя</li></ul></div></div>
+          </section>
+          <section class="rounded-2xl bg-[#151a22] p-5 text-white"><p class="text-[10px] text-white/55">Предварительное время</p><strong class="mt-1 block text-lg">≈ 5 минут</strong><p class="mt-2 text-[10px] leading-4 text-white/55">Демо-расчёт после отправки заявки</p></section>
+        </aside>
+      </div>
+      <div class="mt-5 flex items-center justify-between"><a href="{% url 'business-cabinet' %}" class="grid h-11 w-28 place-items-center rounded-[10px] bg-[#e9ecef] text-[12px] font-semibold text-ink-700">Назад</a><button :disabled="submitting" class="h-11 min-w-40 rounded-[10px] bg-brand-500 px-6 text-[12px] font-bold text-white hover:bg-brand-600 disabled:opacity-60"><span x-show="!submitting">Продолжить</span><span x-cloak x-show="submitting">Отправляем…</span></button></div>
+    </form>
+  </div>
+</main>
+{% endblock %}
+

@@ -1,0 +1,6 @@
+<label class="block text-[12px] font-medium text-ink-700">
+  {{ field.label }}
+  {{ field }}
+  {% if field.errors %}<span class="mt-1.5 block text-[11px] font-normal text-brand-500">{{ field.errors|striptags }}</span>{% endif %}
+</label>
+

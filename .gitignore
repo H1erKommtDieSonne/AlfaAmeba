@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.db
+*.egg-info/
+node_modules/
+.npm-cache/
+staticfiles/
+static/css/app.css
+static/js/app.js
+

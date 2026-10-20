@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Вход · Альфа-Банк Бизнес{% endblock %}
+{% block content %}
+<main class="mx-auto grid min-h-[calc(100vh-69px)] max-w-[1440px] lg:grid-cols-[1.05fr_.95fr]">
+  <section class="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-16 xl:px-24">
+    <div class="max-w-xl">
+      <span class="mb-6 inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-ink-500 shadow-sm">Кредитование для бизнеса</span>
+      <h1 class="text-[42px] font-bold leading-[1.08] tracking-[-.045em] text-ink-950 sm:text-[54px]">Кредит на развитие<br>вашего бизнеса</h1>
+      <p class="mt-5 max-w-md text-[17px] leading-7 text-ink-500">Оформите заявку онлайн и получите предварительное решение от 5 минут.</p>
+      <div class="mt-10 grid max-w-xl gap-3 sm:grid-cols-2">
+        <div class="flex items-center gap-4 rounded-2xl bg-white p-5"><span class="grid size-10 place-items-center rounded-xl bg-canvas text-ink-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><path d="M4 7h16v10H4zM8 11h8M8 14h5"/></svg></span><p><strong class="block text-sm">До 50 млн ₽</strong><small class="mt-1 block text-[11px] text-ink-500">Сумма</small></p></div>
+        <div class="flex items-center gap-4 rounded-2xl bg-white p-5"><span class="grid size-10 place-items-center rounded-xl bg-canvas text-ink-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg></span><p><strong class="block text-sm">От 3 месяцев</strong><small class="mt-1 block text-[11px] text-ink-500">Срок</small></p></div>
+        <div class="flex items-center gap-4 rounded-2xl bg-white p-5"><span class="grid size-10 place-items-center rounded-xl bg-canvas text-ink-500 text-lg">%</span><p><strong class="block text-sm">Персональная ставка</strong><small class="mt-1 block text-[11px] text-ink-500">После проверки</small></p></div>
+        <div class="flex items-center gap-4 rounded-2xl bg-white p-5"><span class="grid size-10 place-items-center rounded-xl bg-canvas text-ink-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><path d="M7 3h7l4 4v14H7zM14 3v5h5M10 12h5M10 16h5"/></svg></span><p><strong class="block text-sm">Короткая анкета</strong><small class="mt-1 block text-[11px] text-ink-500">Только важное</small></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid place-items-center bg-[#f7f8f9] px-5 py-12">
+    <div class="w-full max-w-[440px] rounded-2xl bg-white p-7 shadow-[0_20px_60px_rgba(7,16,31,.07)] sm:p-10" x-data="{ submitting: false, visible: false }">
+      <h2 class="text-[26px] font-bold tracking-[-.03em]">Вход в Альфа-Бизнес</h2>
+      <p class="mt-2 text-sm text-ink-500">Используйте email, указанный при регистрации</p>
+      <form method="post" class="mt-8" @submit="submitting = true">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<p class="mb-5 rounded-[10px] bg-brand-50 px-4 py-3 text-[12px] text-brand-600">Email или пароль указаны неверно</p>{% endif %}
+        <div class="space-y-5">
+          {% include "credit_applications/field.html" with field=form.username %}
+          <div class="relative">{% include "credit_applications/field.html" with field=form.password %}</div>
+        </div>
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <button :disabled="submitting" class="mt-7 h-12 w-full rounded-[10px] bg-brand-500 text-sm font-bold text-white transition hover:bg-brand-600 disabled:opacity-60"><span x-show="!submitting">Продолжить</span><span x-cloak x-show="submitting">Входим…</span></button>
+      </form>
+      <div class="my-7 flex items-center gap-3 text-[11px] text-ink-500"><span class="h-px flex-1 bg-line"></span>или<span class="h-px flex-1 bg-line"></span></div>
+      <a href="{% url 'register' %}" class="grid h-12 place-items-center rounded-[10px] border border-line text-sm font-semibold hover:border-ink-500">Создать аккаунт</a>
+      <p class="mt-7 text-center text-[11px] text-ink-500">Не можете войти? <span class="text-ink-700">Используйте демо-аккаунт из README</span></p>
+    </div>
+  </section>
+</main>
+{% endblock %}
+
