@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
@@ -5,11 +7,21 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from .models import ApplicationComment, Product
 
 
-INPUT_CLASS = (
-    "mt-2 h-12 w-full rounded-[10px] border border-transparent bg-[#f2f3f5] px-4 "
-    "text-[14px] text-[#0b1220] outline-none transition placeholder:text-[#8b95a5] "
-    "hover:bg-[#ebeef1] focus:border-[#ef3124] focus:bg-white focus:ring-2 focus:ring-[#ef3124]/10"
-)
+INPUT_CLASS = "form-control"
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    def clean(self, data, initial=None):
+        files = data if isinstance(data, (list, tuple)) else [data]
+        if not files or files == [None]:
+            if self.required:
+                raise forms.ValidationError(self.error_messages["required"], code="required")
+            return []
+        return [super().clean(file, initial) for file in files]
 
 
 class StyledAuthenticationForm(AuthenticationForm):
@@ -70,6 +82,19 @@ class RegistrationForm(UserCreationForm):
 
 
 class ApplicationForm(forms.Form):
+    ALLOWED_DOCUMENT_EXTENSIONS = {
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".xlsx",
+        ".xls",
+        ".csv",
+        ".docx",
+    }
+    MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
+    MAX_DOCUMENTS_SIZE = 50 * 1024 * 1024
+
     organization_name = forms.CharField(
         label="Название бизнеса",
         min_length=2,
@@ -95,7 +120,7 @@ class ApplicationForm(forms.Form):
         min_value=1,
         max_digits=14,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": INPUT_CLASS, "step": "10000"}),
+        widget=forms.NumberInput(attrs={"class": INPUT_CLASS, "step": "any"}),
     )
     term_months = forms.IntegerField(
         label="Срок, месяцев",
@@ -107,7 +132,17 @@ class ApplicationForm(forms.Form):
         label="На что нужны деньги?",
         min_length=10,
         max_length=1000,
-        widget=forms.Textarea(attrs={"class": INPUT_CLASS.replace("h-12", "min-h-28 py-3"), "rows": 3}),
+        widget=forms.Textarea(attrs={"class": INPUT_CLASS, "rows": 3}),
+    )
+    documents = MultipleFileField(
+        label="Документы",
+        help_text="PDF, изображения, таблицы или DOCX — до 20 МБ каждый и 50 МБ суммарно",
+        widget=MultipleFileInput(
+            attrs={
+                "class": "form-control file-control",
+                "accept": ".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,.docx",
+            }
+        ),
     )
 
     def __init__(self, *args, **kwargs):
@@ -130,6 +165,20 @@ class ApplicationForm(forms.Form):
                 f"Для этого продукта срок от {product.min_term_months} до {product.max_term_months} месяцев",
             )
         return data
+
+    def clean_documents(self):
+        documents = self.cleaned_data["documents"]
+        total_size = 0
+        for document in documents:
+            suffix = Path(document.name).suffix.lower()
+            if suffix not in self.ALLOWED_DOCUMENT_EXTENSIONS:
+                raise forms.ValidationError(f"Формат {suffix or 'без расширения'} не поддерживается")
+            if document.size > self.MAX_DOCUMENT_SIZE:
+                raise forms.ValidationError(f"Файл {document.name} превышает 20 МБ")
+            total_size += document.size
+        if total_size > self.MAX_DOCUMENTS_SIZE:
+            raise forms.ValidationError("Общий размер документов превышает 50 МБ")
+        return documents
 
 
 class ReviewActionForm(forms.Form):
@@ -156,7 +205,7 @@ class ReviewActionForm(forms.Form):
         required=False,
         max_length=2000,
         widget=forms.Textarea(
-            attrs={"class": INPUT_CLASS.replace("h-12", "min-h-24 py-3"), "rows": 3}
+            attrs={"class": INPUT_CLASS, "rows": 3}
         ),
     )
 
@@ -177,7 +226,7 @@ class CommentForm(forms.Form):
         min_length=3,
         max_length=2000,
         widget=forms.Textarea(
-            attrs={"class": INPUT_CLASS.replace("h-12", "min-h-24 py-3"), "rows": 3}
+            attrs={"class": INPUT_CLASS, "rows": 3}
         ),
     )
     audience = forms.ChoiceField(

@@ -100,6 +100,11 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://127.0.0.1:9000")
+LLM_SERVICE_TOKEN = os.getenv(
+    "LLM_SERVICE_TOKEN", "unsafe-local-llm-token" if DEBUG else ""
+)
+LLM_JOB_LEASE_SECONDS = int(os.getenv("LLM_JOB_LEASE_SECONDS", "600"))
+LLM_RETRY_DELAY_SECONDS = int(os.getenv("LLM_RETRY_DELAY_SECONDS", "60"))
 CSRF_TRUSTED_ORIGINS = [
     item.strip()
     for item in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")

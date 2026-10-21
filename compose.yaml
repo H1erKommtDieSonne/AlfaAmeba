@@ -32,6 +32,9 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,django}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
       ML_SERVICE_URL: http://ml:9000
+      LLM_SERVICE_TOKEN: ${LLM_SERVICE_TOKEN:-change-me-local-llm-token}
+      LLM_JOB_LEASE_SECONDS: ${LLM_JOB_LEASE_SECONDS:-600}
+      LLM_RETRY_DELAY_SECONDS: ${LLM_RETRY_DELAY_SECONDS:-60}
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media
@@ -74,6 +77,8 @@ services:
       dockerfile: Dockerfile
     environment:
       MODEL_PATH: /models
+      DJANGO_QUEUE_URL: http://django:8000/api/v1/llm
+      LLM_SERVICE_TOKEN: ${LLM_SERVICE_TOKEN:-change-me-local-llm-token}
     volumes:
       - ./models:/models:ro
     healthcheck:

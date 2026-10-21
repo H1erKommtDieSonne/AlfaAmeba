@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Подтверждение организации · Альфа-Банк Бизнес{% endblock %}
 {% block content %}
-<main class="mx-auto max-w-[900px] px-5 py-10 sm:px-8">
-  <p class="text-[11px] text-ink-500">Кабинет бизнеса / Доступ</p>
-  <h1 class="mt-2 text-[30px] font-bold tracking-[-.04em]">Подтверждение полномочий</h1>
-  <p class="mt-3 max-w-2xl text-sm leading-6 text-ink-500">Указание ИНН не даёт доступ к организации автоматически. Администратор банка должен подтвердить, что вы вправе действовать от её имени.</p>
-  <div class="mt-7 space-y-4">{% for item in access_requests %}<article class="rounded-2xl border border-line bg-white p-6"><div class="flex flex-wrap items-start justify-between gap-4"><div><h2 class="text-[16px] font-bold">{{ item.organization.name }}</h2><p class="mt-1 text-[11px] text-ink-500">ИНН {{ item.organization.inn }} · запрос от {{ item.created_at|date:"d.m.Y H:i" }}</p></div><span class="rounded-md px-3 py-1.5 text-[10px] font-semibold {% if item.status == 'APPROVED' %}bg-emerald-50 text-emerald-700{% elif item.status == 'REJECTED' %}bg-brand-50 text-brand-600{% else %}bg-amber-50 text-amber-700{% endif %}">{{ item.get_status_display }}</span></div>{% if item.review_note %}<p class="mt-4 rounded-xl bg-canvas p-4 text-[12px]">{{ item.review_note }}</p>{% endif %}{% if item.status == 'APPROVED' %}<a href="{% url 'business-cabinet' %}" class="mt-4 inline-grid h-10 place-items-center rounded-[10px] bg-brand-500 px-5 text-[11px] font-bold text-white">Перейти к заявке</a>{% endif %}</article>{% empty %}<div class="rounded-2xl border border-line bg-white p-10 text-center text-sm text-ink-500">Запросов на подтверждение пока нет.</div>{% endfor %}</div>
+<main class="content-main content-main--narrow">
+  <header class="page-header"><div><p class="breadcrumb">Кабинет бизнеса / Доступ</p><h1>Подтверждение полномочий</h1><p>ИНН не даёт доступ к организации автоматически. Банк должен подтвердить право действовать от её имени.</p></div></header>
+  <div class="stack">{% for item in access_requests %}<article class="panel"><div class="panel__header"><div><h2>{{ item.organization.name }}</h2><p>ИНН {{ item.organization.inn }} · запрос от {{ item.created_at|date:"d.m.Y H:i" }}</p></div><span class="status {% if item.status == 'APPROVED' %}status--positive{% elif item.status == 'REJECTED' %}status--negative{% else %}status--warning{% endif %}">{{ item.get_status_display }}</span></div>{% if item.review_note or item.status == 'APPROVED' %}<div class="panel__body">{% if item.review_note %}<p class="review-note">{{ item.review_note }}</p>{% endif %}{% if item.status == 'APPROVED' %}<a href="{% url 'business-cabinet' %}" class="button button--decision">Перейти к заявке</a>{% endif %}</div>{% endif %}</article>{% empty %}<section class="panel"><div class="empty-state"><h2>Запросов пока нет</h2><p>Запрос появится после выбора компании.</p></div></section>{% endfor %}</div>
 </main>
 {% endblock %}
+

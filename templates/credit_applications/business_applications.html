@@ -1,18 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Мои заявки · Альфа-Банк Бизнес{% endblock %}
 {% block content %}
-<main class="mx-auto max-w-[1200px] px-5 py-8 sm:px-8 lg:py-10">
-  <div class="mb-7 flex items-end justify-between gap-5">
-    <div><p class="text-[11px] text-ink-500">Кабинет бизнеса</p><h1 class="mt-2 text-[32px] font-bold tracking-[-.04em]">Мои заявки</h1><p class="mt-2 text-sm text-ink-500">Статусы, сообщения банка и отправленные версии</p></div>
-    <a href="{% url 'business-cabinet' %}" class="grid h-11 place-items-center rounded-[10px] bg-brand-500 px-5 text-[12px] font-bold text-white hover:bg-brand-600">Новая заявка</a>
-  </div>
-  <section class="overflow-hidden rounded-2xl border border-line bg-white">
+<main class="content-main">
+  <header class="page-header">
+    <div><p class="breadcrumb">Кабинет бизнеса</p><h1>Мои заявки</h1><p>Статусы, сообщения банка и отправленные версии</p></div>
+    <a href="{% url 'business-cabinet' %}" class="button button--decision">Новая заявка</a>
+  </header>
+  <section class="panel">
     {% if rows %}
-    <div class="overflow-x-auto"><table class="w-full min-w-[760px] text-left text-[12px]">
-      <thead class="bg-[#f7f8f9] text-[10px] text-ink-500"><tr><th class="px-5 py-3.5">Заявка</th><th class="px-5 py-3.5">Компания</th><th class="px-5 py-3.5">Продукт</th><th class="px-5 py-3.5">Сумма</th><th class="px-5 py-3.5">Версия</th><th class="px-5 py-3.5">Статус</th></tr></thead>
-      <tbody class="divide-y divide-line">{% for row in rows %}<tr class="hover:bg-[#fafbfb]"><td class="px-5 py-4"><a class="font-semibold hover:text-brand-500" href="{% url 'business-application-detail' row.application.id %}">№{{ row.application.id|stringformat:"s"|slice:":8"|upper }}</a></td><td class="px-5 py-4">{{ row.application.organization_name }}<small class="mt-1 block text-ink-500">ИНН {{ row.application.inn }}</small></td><td class="px-5 py-4">{{ row.version.product.name }}</td><td class="px-5 py-4 font-semibold">{{ row.version.amount|floatformat:"0g" }} ₽</td><td class="px-5 py-4">№{{ row.version.version_number }}</td><td class="px-5 py-4"><span class="rounded-md px-2 py-1 text-[10px] font-semibold {% if row.application.status == 'APPROVED' %}bg-emerald-50 text-emerald-700{% elif row.application.status == 'DECLINED' or row.application.status == 'NEEDS_REVISION' %}bg-brand-50 text-brand-600{% elif row.application.status == 'PENDING_APPROVAL' %}bg-violet-50 text-violet-700{% else %}bg-blue-50 text-blue-600{% endif %}">{{ row.application.get_status_display }}</span></td></tr>{% endfor %}</tbody>
-    </table></div>
-    {% else %}<div class="px-6 py-20 text-center"><h2 class="text-xl font-bold">Заявок пока нет</h2><p class="mt-2 text-sm text-ink-500">Создайте первую заявку — она появится здесь.</p><a href="{% url 'business-cabinet' %}" class="mt-5 inline-grid h-11 place-items-center rounded-[10px] bg-brand-500 px-5 text-[12px] font-bold text-white">Создать заявку</a></div>{% endif %}
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Заявка</th><th>Компания</th><th>Продукт</th><th class="num">Сумма</th><th>Версия</th><th>Статус</th></tr></thead>
+        <tbody>{% for row in rows %}<tr>
+          <td><a href="{% url 'business-application-detail' row.application.id %}">№{{ row.application.id|stringformat:"s"|slice:":8"|upper }}</a></td>
+          <td>{{ row.application.organization_name }}<small>ИНН {{ row.application.inn }}</small></td><td>{{ row.version.product.name }}</td><td class="num">{{ row.version.amount|floatformat:"0g" }} ₽</td><td>№{{ row.version.version_number }}</td>
+          <td><span class="status {% if row.application.status == 'APPROVED' %}status--positive{% elif row.application.status == 'DECLINED' %}status--negative{% elif row.application.status == 'NEEDS_REVISION' or row.application.status == 'PENDING_APPROVAL' %}status--warning{% elif row.application.status == 'IN_REVIEW' or row.application.status == 'SUBMITTED' %}status--progress{% else %}status--neutral{% endif %}">{{ row.application.get_status_display }}</span></td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+    {% else %}<div class="empty-state"><h2>Заявок пока нет</h2><p>Создайте первую заявку — её статус и вопросы банка появятся здесь.</p><a href="{% url 'business-cabinet' %}" class="button button--decision empty-state__action">Создать заявку</a></div>{% endif %}
   </section>
 </main>
 {% endblock %}

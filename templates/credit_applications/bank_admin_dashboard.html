@@ -1,28 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Администрирование · Альфа-Банк Бизнес{% endblock %}
+{% block title %}Доступы · Альфа-Банк Бизнес{% endblock %}
 {% block content %}
-<main class="mx-auto grid min-h-[calc(100vh-69px)] max-w-[1440px] bg-white lg:grid-cols-[220px_1fr]">
-  <aside class="hidden border-r border-line bg-[#fbfcfc] px-4 py-7 lg:block">
-    <p class="mb-3 px-4 text-[9px] font-semibold uppercase tracking-[.14em] text-ink-500">Рабочее пространство</p>
-    <nav class="space-y-1 text-[12px]" aria-label="Разделы администратора">
-      <a href="{% url 'bank-admin-dashboard' %}" class="flex items-center gap-3 rounded-[10px] bg-brand-50 px-4 py-3 font-semibold text-brand-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><path d="M4 13h7V4H4zM13 20h7V11h-7zM4 20h7v-5H4zM13 9h7V4h-7z"/></svg>Обзор</a>
-      <span class="flex items-center gap-3 rounded-[10px] px-4 py-3 text-ink-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2"/><path d="M4 19c.6-3 2.2-5 5-5s4.4 2 5 5M14 15c2.8 0 4.3 1.5 5 4"/></svg>Пользователи<span class="ml-auto rounded-full bg-[#e8ebee] px-2 py-0.5 text-[10px]">{{ total_users }}</span></span>
-      <span class="flex items-center gap-3 rounded-[10px] px-4 py-3 text-ink-500"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><path d="M5 4h14v16H5zM9 9h6M9 13h6"/></svg>Роли и доступы</span>
-      <div class="my-4 h-px bg-line"></div>
-      <a href="/admin/" class="flex items-center gap-3 rounded-[10px] px-4 py-3 text-ink-500 hover:bg-canvas hover:text-ink-950"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.5-.8-1.8 1-1.8-2.1-2.1-1.8 1-1.8-.8L11 2H8l-.5 2.5-1.8.8-1.8-1-2.1 2.1 1 1.8L2 10v3l2.8.6.8 1.8-1 1.8 2.1 2.1 1.8-1 1.8.8L11 22h3l.5-2.8 1.8-.8 1.8 1 2.1-2.1-1-1.8z"/></svg>Django Admin</a>
+<main class="workspace">
+  <aside class="sidebar">
+    <p class="sidebar__scope"><strong>Управление доступом</strong>Служебный раздел банка</p>
+    <p class="sidebar__group">Разделы</p>
+    <nav class="sidebar__nav" aria-label="Разделы управления">
+      <a href="{% url 'bank-admin-dashboard' %}" class="is-active">Запросы и пользователи</a>
+      <a href="{% url 'bank-queue' %}">Кредитные заявки</a>
     </nav>
+    <p class="sidebar__group">Система</p>
+    <nav class="sidebar__nav"><a href="/admin/">Django Admin</a></nav>
   </aside>
 
-  <section class="min-w-0 px-5 py-8 sm:px-8 lg:px-10">
-    <div class="mb-8"><p class="text-[11px] text-ink-500">Банк / Администрирование</p><h1 class="mt-2 text-[32px] font-bold tracking-[-.04em]">Управление доступом</h1><p class="mt-2 text-sm text-ink-500">Пользователи, роли и подтверждение полномочий представителей бизнеса</p></div>
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <article class="rounded-2xl border border-line bg-white p-5"><div class="flex items-center justify-between"><span class="grid size-9 place-items-center rounded-xl bg-blue-50 text-blue-600"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 8v4M12 16h.01"/></svg></span><span class="text-[10px] text-ink-500">Ожидают</span></div><strong class="mt-5 block text-3xl">{{ pending_access_count }}</strong><p class="mt-1 text-[11px] text-ink-500">Запросов доступа</p></article>
-      <article class="rounded-2xl border border-line bg-white p-5"><div class="flex items-center justify-between"><span class="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2"/><path d="M4 19c.6-3 2.2-5 5-5s4.4 2 5 5M14 15c2.8 0 4.3 1.5 5 4"/></svg></span><span class="text-[10px] text-ink-500">Всего</span></div><strong class="mt-5 block text-3xl">{{ total_users }}</strong><p class="mt-1 text-[11px] text-ink-500">Пользователей</p></article>
-      <article class="rounded-2xl border border-line bg-white p-5"><div class="flex items-center justify-between"><span class="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="9" cy="9" r="3"/><path d="M4 19c.6-3 2.2-5 5-5s4.4 2 5 5"/></svg></span><span class="text-[10px] text-ink-500">Клиенты</span></div><strong class="mt-5 block text-3xl">{{ business_users }}</strong><p class="mt-1 text-[11px] text-ink-500">Бизнес-пользователей</p></article>
-      <article class="rounded-2xl border border-line bg-white p-5"><div class="flex items-center justify-between"><span class="grid size-9 place-items-center rounded-xl bg-violet-50 text-violet-600"><svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.7"><circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2"/><path d="M4 19c.6-3 2.2-5 5-5s4.4 2 5 5M14 15c2.8 0 4.3 1.5 5 4"/></svg></span><span class="text-[10px] text-ink-500">Команда</span></div><strong class="mt-5 block text-3xl">{{ bank_users }}</strong><p class="mt-1 text-[11px] text-ink-500">Сотрудников банка</p></article>
-    </div>
+  <section class="workspace-main">
+    <header class="page-header"><div><p class="breadcrumb">Банк / Администрирование</p><h1>Управление доступом</h1><p>Подтверждение полномочий и обзор пользователей системы</p></div></header>
+    <dl class="stats-strip">
+      <div class="stat"><dt>Ожидают проверки</dt><dd>{{ pending_access_count }}</dd></div>
+      <div class="stat"><dt>Всего пользователей</dt><dd>{{ total_users }}</dd></div>
+      <div class="stat"><dt>Представители бизнеса</dt><dd>{{ business_users }}</dd></div>
+      <div class="stat"><dt>Сотрудники банка</dt><dd>{{ bank_users }}</dd></div>
+    </dl>
 
-    {% if pending_access_requests %}<section class="mt-6 overflow-hidden rounded-2xl border border-line bg-white"><div class="border-b border-line px-5 py-4"><h2 class="text-[15px] font-bold">Запросы на доступ к организациям</h2><p class="mt-1 text-[10px] text-ink-500">Проверка полномочий выполняется вручную; ИНН сам по себе не подтверждает право доступа.</p></div><div class="divide-y divide-line">{% for item in pending_access_requests %}<article class="grid gap-4 px-5 py-5 lg:grid-cols-[1fr_1fr_320px]"><div><strong class="text-[13px]">{{ item.organization.name }}</strong><p class="mt-1 text-[10px] text-ink-500">ИНН {{ item.organization.inn }}</p></div><div><p class="text-[12px]">{{ item.user.get_full_name|default:item.user.email }}</p><p class="mt-1 text-[10px] text-ink-500">{{ item.user.email }} · {{ item.created_at|date:"d.m.Y H:i" }}</p></div><form method="post" action="{% url 'review-access-request' item.id %}" class="flex flex-wrap gap-2">{% csrf_token %}<input name="note" class="h-10 min-w-0 flex-1 rounded-[10px] border border-line px-3 text-[11px]" placeholder="Комментарий"><button name="action" value="approve" class="h-10 rounded-[10px] bg-brand-500 px-4 text-[11px] font-bold text-white">Подтвердить</button><button name="action" value="reject" class="h-10 rounded-[10px] border border-line px-4 text-[11px] font-semibold">Отклонить</button></form></article>{% endfor %}</div></section>{% endif %}
+    <section class="panel panel--decision">
+      <div class="panel__header"><div><h2>Запросы на доступ к организациям</h2><p>ИНН сам по себе не подтверждает право представителя.</p></div><span class="status status--warning">{{ pending_access_count }} ожидают</span></div>
+      {% if pending_access_requests %}
+        <div class="access-list">{% for item in pending_access_requests %}
+          <article class="access-row">
+            <div><strong>{{ item.organization.name }}</strong><small>ИНН {{ item.organization.inn }}</small></div>
+            <div><strong>{{ item.user.get_full_name|default:item.user.email }}</strong><small>{{ item.user.email }} · {{ item.created_at|date:"d.m.Y H:i" }}</small></div>
+            <form method="post" action="{% url 'review-access-request' item.id %}" class="access-actions">{% csrf_token %}<input name="note" class="form-control" placeholder="Комментарий к решению"><button name="action" value="approve" class="button button--decision">Подтвердить</button><button name="action" value="reject" class="button button--secondary">Отклонить</button></form>
+          </article>
+        {% endfor %}</div>
+      {% else %}<div class="empty-state"><h2>Все запросы разобраны</h2><p>Новые запросы представителей появятся здесь.</p></div>{% endif %}
+    </section>
   </section>
 </main>
 {% endblock %}

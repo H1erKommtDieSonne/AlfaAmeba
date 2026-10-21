@@ -1,3 +1,5 @@
+import hashlib
+
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -6,8 +8,10 @@ from .forms import ApplicationForm, ReviewActionForm
 from .models import (
     Application,
     ApplicationComment,
+    ApplicationDocument,
     ApplicationEvent,
     ApplicationVersion,
+    DocumentProcessingJob,
     Organization,
     OrganizationAccessRequest,
     OrganizationMembership,
@@ -31,6 +35,23 @@ def _snapshot(data, *, version_number, submitted_at):
         "version": version_number,
         "submitted_at": submitted_at.isoformat(),
     }
+
+
+def _save_documents_and_enqueue(version, documents):
+    for uploaded_file in documents:
+        digest = hashlib.sha256()
+        for chunk in uploaded_file.chunks():
+            digest.update(chunk)
+        uploaded_file.seek(0)
+        ApplicationDocument.objects.create(
+            version=version,
+            file=uploaded_file,
+            original_name=uploaded_file.name[:255],
+            content_type=(uploaded_file.content_type or "application/octet-stream")[:120],
+            size=uploaded_file.size,
+            sha256=digest.hexdigest(),
+        )
+    return DocumentProcessingJob.objects.create(version=version)
 
 
 def _organization_for_submission(data, user):
@@ -120,7 +141,7 @@ def submit_application(form: ApplicationForm, user) -> Application | Organizatio
         status=Application.Status.SUBMITTED,
         submitted_at=submitted_at,
     )
-    ApplicationVersion.objects.create(
+    version = ApplicationVersion.objects.create(
         application=application,
         version_number=1,
         product=data["product"],
@@ -130,6 +151,7 @@ def submit_application(form: ApplicationForm, user) -> Application | Organizatio
         submitted_at=submitted_at,
         snapshot=_snapshot(data, version_number=1, submitted_at=submitted_at),
     )
+    _save_documents_and_enqueue(version, data["documents"])
     ApplicationEvent.objects.create(
         application=application,
         actor=user,
@@ -176,6 +198,7 @@ def submit_revision(application: Application, form: ApplicationForm, user) -> Ap
         submitted_at=submitted_at,
         snapshot=_snapshot(data, version_number=version_number, submitted_at=submitted_at),
     )
+    _save_documents_and_enqueue(version, data["documents"])
     application.current_version = version_number
     application.status = Application.Status.SUBMITTED
     application.submitted_at = submitted_at
@@ -305,3 +328,5 @@ def perform_review_action(application: Application, *, actor, action, note="") -
         metadata={"action": action},
     )
     return application
+import hashlib
+

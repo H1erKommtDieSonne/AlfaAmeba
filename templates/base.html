@@ -4,49 +4,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Демонстрационный кабинет кредитования бизнеса">
+  <meta name="description" content="Кредитный кабинет для бизнеса">
   <title>{% block title %}Альфа-Банк Бизнес{% endblock %}</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = saved || (systemDark ? "dark" : "light");
+      } catch (_) {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script defer src="{% static 'js/app.js' %}"></script>
   <style>[x-cloak]{display:none!important}</style>
 </head>
-<body class="min-h-screen bg-canvas text-ink-950 antialiased">
-  <header class="relative z-30 border-b border-line bg-white">
-    <div class="mx-auto flex h-[68px] max-w-[1440px] items-center px-5 sm:px-8">
-      <a href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}" aria-label="Альфа-Банк Бизнес">
-        {% include "components/logo.html" %}
-      </a>
-
+<body>
+  <header class="app-header" x-data="{ mobile: false, account: false, theme: document.documentElement.dataset.theme, toggleTheme() { this.theme = this.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = this.theme; localStorage.setItem('theme', this.theme) } }">
+    <div class="app-header__inner">
+      <a href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}" aria-label="Альфа-Банк Бизнес">{% include "components/logo.html" %}</a>
       {% if user.is_authenticated %}
-      <nav class="ml-10 hidden h-full items-center gap-8 text-[12px] font-medium text-ink-500 md:flex" aria-label="Основная навигация">
-        {% if can_submit_applications %}<a href="{% url 'business-applications' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'business-applications' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Мои заявки</a><a href="{% url 'business-cabinet' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'business' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Новая заявка</a>{% endif %}
-        {% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'bank' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Заявки</a>{% endif %}
-        {% if can_manage_bank %}<a href="{% url 'bank-admin-dashboard' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'bank-admin' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Администрирование</a>{% endif %}
-      </nav>
-      <div class="ml-auto flex items-center gap-4" x-data="{ open: false }">
-        <button type="button" class="grid size-9 place-items-center rounded-full text-ink-500 hover:bg-canvas" aria-label="Уведомления">
-          <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current" stroke-width="1.6"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-        </button>
-        <div class="relative">
-          <button type="button" @click="open = !open" @click.outside="open = false" class="flex items-center gap-3 rounded-xl p-1.5 hover:bg-canvas" :aria-expanded="open">
-            <span class="grid size-9 place-items-center rounded-full bg-[#eef0f2] text-[11px] font-bold text-ink-700">{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
-            <span class="hidden text-left lg:block"><strong class="block text-[12px] font-semibold">{{ user.get_full_name|default:user.email }}</strong><small class="block max-w-40 truncate text-[10px] text-ink-500">{% if can_manage_bank %}Администратор банка{% elif can_approve_applications %}Старший согласующий{% elif can_process_applications %}Кредитный специалист{% else %}Представитель бизнеса{% endif %}</small></span>
-            <svg viewBox="0 0 20 20" class="hidden size-4 fill-none stroke-current text-ink-500 lg:block"><path d="m6 8 4 4 4-4" stroke-width="1.5"/></svg>
+        <nav class="header-nav" aria-label="Основная навигация">
+          {% if can_submit_applications %}<a href="{% url 'business-applications' %}" class="{% if active_cabinet == 'business-applications' %}is-active{% endif %}">Мои заявки</a><a href="{% url 'business-cabinet' %}" class="{% if active_cabinet == 'business' %}is-active{% endif %}">Новая заявка</a>{% endif %}
+          {% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="{% if active_cabinet == 'bank' %}is-active{% endif %}">Заявки</a>{% endif %}
+          {% if can_manage_bank %}<a href="{% url 'bank-admin-dashboard' %}" class="{% if active_cabinet == 'bank-admin' %}is-active{% endif %}">Доступы</a>{% endif %}
+        </nav>
+        <div class="account-menu">
+          <button type="button" class="mobile-menu-button" @click="mobile = !mobile" :aria-expanded="mobile" aria-label="Открыть меню"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+          <button type="button" class="theme-toggle" @click="toggleTheme()" :aria-label="theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'" :title="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'">
+            <svg x-show="theme !== 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>
+            <svg x-cloak x-show="theme === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>
           </button>
-          <div x-cloak x-show="open" x-transition.origin.top.right class="absolute right-0 top-12 w-52 rounded-xl border border-line bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,.14)]">
-            <div class="border-b border-line px-3 py-2 text-xs text-ink-500 lg:hidden">{{ user.email }}</div>
-            <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-canvas">Выйти</button></form>
-          </div>
+          <button type="button" class="account-trigger" @click="account = !account" @click.outside="account = false" :aria-expanded="account">
+            <span class="account-avatar">{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
+            <span class="account-copy"><strong>{{ user.get_full_name|default:user.email }}</strong><small>{% if can_manage_bank %}Управление доступом{% elif can_approve_applications %}Старший согласующий{% elif can_process_applications %}Кредитный специалист{% else %}Представитель бизнеса{% endif %}</small></span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg>
+          </button>
+          <div x-cloak x-show="account" x-transition.origin.top.right class="account-popover"><p>{{ user.email }}</p><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Выйти</button></form></div>
         </div>
-      </div>
+        <nav x-cloak x-show="mobile" x-transition class="mobile-sheet" aria-label="Мобильная навигация">
+          {% if can_submit_applications %}<a href="{% url 'business-applications' %}">Мои заявки</a><a href="{% url 'business-cabinet' %}">Новая заявка</a>{% endif %}
+          {% if can_review_applications %}<a href="{% url 'bank-queue' %}">Заявки</a>{% endif %}
+          {% if can_manage_bank %}<a href="{% url 'bank-admin-dashboard' %}">Доступы</a>{% endif %}
+          <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Выйти</button></form>
+        </nav>
       {% else %}
-      <a href="{% url 'register' %}" class="ml-auto text-[12px] font-medium text-ink-700 hover:text-brand-500">Стать клиентом</a>
+        <nav class="guest-nav" aria-label="Авторизация">
+          <button type="button" class="theme-toggle" @click="toggleTheme()" :aria-label="theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'" :title="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'">
+            <svg x-show="theme !== 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>
+            <svg x-cloak x-show="theme === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>
+          </button>
+          <a href="{% url 'login' %}">Войти</a><a href="{% url 'register' %}" class="button button--primary">Стать клиентом</a>
+        </nav>
       {% endif %}
     </div>
   </header>
-
-  {% if messages %}<div class="fixed right-5 top-20 z-50 w-[min(380px,calc(100%-40px))]" x-data="{ show: true }" x-show="show" x-transition>{% for message in messages %}<div class="flex gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm shadow-xl"><span class="grid size-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">✓</span><p class="flex-1 leading-5">{{ message }}</p><button @click="show=false" class="self-start text-ink-500">×</button></div>{% endfor %}</div>{% endif %}
+  {% if messages %}<div class="toast-stack" x-data="{ show: true }" x-show="show" x-transition>{% for message in messages %}<div class="toast"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 10 3 3 7-7"/></svg><p>{{ message }}</p><button type="button" @click="show=false" aria-label="Закрыть">×</button></div>{% endfor %}</div>{% endif %}
   {% block content %}{% endblock %}
 </body>
 </html>
-

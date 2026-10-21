@@ -5,6 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY server.py ./server.py
+COPY queue_client.py ./queue_client.py
 
 RUN useradd --system ml
 USER ml

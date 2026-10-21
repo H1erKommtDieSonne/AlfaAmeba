@@ -1,23 +1,46 @@
+import json
 from decimal import Decimal
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import (
     Application,
     ApplicationComment,
+    ApplicationDocument,
     ApplicationEvent,
+    DocumentProcessingJob,
     Organization,
     OrganizationAccessRequest,
     OrganizationMembership,
     Product,
+    SerializedDocument,
     UserProfile,
 )
 
 
 class VerticalSliceTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._media_directory = TemporaryDirectory()
+        cls._settings_override = override_settings(
+            MEDIA_ROOT=cls._media_directory.name,
+            LLM_SERVICE_TOKEN="test-llm-token",
+            LLM_RETRY_DELAY_SECONDS=0,
+        )
+        cls._settings_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._settings_override.disable()
+        cls._media_directory.cleanup()
+
     @classmethod
     def setUpTestData(cls):
         cls.product = Product.objects.create(
@@ -70,11 +93,27 @@ class VerticalSliceTests(TestCase):
             "amount": "1500000.00",
             "term_months": "12",
             "purpose": "Закупка сезонной партии товара на три месяца",
+            "documents": [
+                SimpleUploadedFile(
+                    "account-statement.pdf",
+                    b"%PDF-1.4 synthetic statement",
+                    content_type="application/pdf",
+                )
+            ],
         }
 
     def test_anonymous_user_is_redirected_to_login(self):
         response = self.client.get(reverse("business-cabinet"))
         self.assertRedirects(response, f"{reverse('login')}?next={reverse('business-cabinet')}")
+
+    def test_application_form_renders_as_functional_four_step_wizard(self):
+        self.client.force_login(self.business_user)
+        response = self.client.get(reverse("business-cabinet"))
+
+        self.assertContains(response, 'x-data="applicationWizard(')
+        self.assertContains(response, 'data-form-step="4"')
+        self.assertContains(response, 'name="amount"')
+        self.assertContains(response, 'step="any"')
 
     def test_registration_creates_business_profile_and_logs_user_in(self):
         response = self.client.post(
@@ -96,6 +135,8 @@ class VerticalSliceTests(TestCase):
     def test_submission_creates_snapshot_visible_to_bank(self):
         self.client.force_login(self.business_user)
         response = self.client.post(reverse("business-cabinet"), self.valid_payload())
+        self.assertEqual(response.status_code, 302, response.content.decode())
+        self.assertNotEqual(response.url, reverse("organization-access-status"))
         application = Application.objects.get()
         version = application.versions.get()
 
@@ -112,6 +153,8 @@ class VerticalSliceTests(TestCase):
         )
         self.assertEqual(version.snapshot["organization_name"], "ООО Север")
         self.assertEqual(version.snapshot["amount"], "1500000.00")
+        self.assertEqual(version.documents.count(), 1)
+        self.assertEqual(version.processing_job.status, DocumentProcessingJob.Status.PENDING)
 
         self.client.force_login(self.bank_user)
         queue = self.client.get(reverse("bank-queue"))
@@ -121,6 +164,113 @@ class VerticalSliceTests(TestCase):
         version.purpose = "Попытка изменить уже отправленную версию"
         with self.assertRaises(ValidationError):
             version.save()
+
+    def test_llm_worker_claims_downloads_and_completes_job(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        document = ApplicationDocument.objects.get()
+        headers = {"HTTP_AUTHORIZATION": "Bearer test-llm-token"}
+
+        unauthorized = self.client.post(
+            reverse("llm-job-claim"),
+            data=json.dumps({"worker_id": "worker-1"}),
+            content_type="application/json",
+        )
+        self.assertEqual(unauthorized.status_code, 401)
+
+        claimed = self.client.post(
+            reverse("llm-job-claim"),
+            data=json.dumps({"worker_id": "worker-1"}),
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(claimed.status_code, 200)
+        job_payload = claimed.json()
+        self.assertEqual(job_payload["documents"][0]["document_id"], str(document.pk))
+
+        empty_queue = self.client.post(
+            reverse("llm-job-claim"),
+            data="{}",
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(empty_queue.status_code, 204)
+
+        blocked_download = self.client.get(
+            reverse("llm-job-document", args=(job_payload["job_id"], document.pk)),
+            **headers,
+        )
+        self.assertEqual(blocked_download.status_code, 409)
+
+        downloaded = self.client.get(
+            reverse("llm-job-document", args=(job_payload["job_id"], document.pk)),
+            HTTP_X_LEASE_TOKEN=job_payload["lease_token"],
+            **headers,
+        )
+        self.assertEqual(downloaded.status_code, 200)
+        self.assertEqual(b"".join(downloaded.streaming_content), b"%PDF-1.4 synthetic statement")
+
+        completed = self.client.post(
+            reverse("llm-job-complete", args=(job_payload["job_id"],)),
+            data=json.dumps(
+                {
+                    "lease_token": job_payload["lease_token"],
+                    "documents": [
+                        {
+                            "document_id": str(document.pk),
+                            "document_type": "bank_statement",
+                            "schema_version": "1.0",
+                            "confidence": 0.93,
+                            "payload": {
+                                "account": "synthetic",
+                                "transactions": [],
+                            },
+                        }
+                    ],
+                    "summary": {"document_count": 1},
+                }
+            ),
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(completed.status_code, 200)
+        job = DocumentProcessingJob.objects.get(pk=job_payload["job_id"])
+        self.assertEqual(job.status, DocumentProcessingJob.Status.COMPLETED)
+        self.assertEqual(SerializedDocument.objects.get().payload["account"], "synthetic")
+        self.assertTrue(
+            ApplicationEvent.objects.filter(
+                application=job.version.application,
+                event_type=ApplicationEvent.Type.DOCUMENTS_PROCESSED,
+            ).exists()
+        )
+
+    def test_llm_worker_can_return_retryable_failure(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        headers = {"HTTP_AUTHORIZATION": "Bearer test-llm-token"}
+        claimed = self.client.post(
+            reverse("llm-job-claim"),
+            data="{}",
+            content_type="application/json",
+            **headers,
+        ).json()
+
+        failed = self.client.post(
+            reverse("llm-job-fail", args=(claimed["job_id"],)),
+            data=json.dumps(
+                {
+                    "lease_token": claimed["lease_token"],
+                    "error": "Временная ошибка OCR",
+                    "retryable": True,
+                }
+            ),
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(failed.status_code, 200)
+        job = DocumentProcessingJob.objects.get(pk=claimed["job_id"])
+        self.assertEqual(job.status, DocumentProcessingJob.Status.PENDING)
+        self.assertEqual(job.last_error, "Временная ошибка OCR")
 
     def test_business_user_cannot_open_bank_queue(self):
         self.client.force_login(self.business_user)

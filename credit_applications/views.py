@@ -9,6 +9,7 @@ from .forms import ApplicationForm, CommentForm, RegistrationForm, ReviewActionF
 from .models import (
     Application,
     ApplicationComment,
+    DocumentProcessingJob,
     OrganizationAccessRequest,
     Product,
     UserProfile,
@@ -60,7 +61,7 @@ def business_cabinet(request):
     if not can_submit_applications(request.user):
         return redirect("dashboard")
     if request.method == "POST":
-        form = ApplicationForm(request.POST)
+        form = ApplicationForm(request.POST, request.FILES)
         if form.is_valid():
             try:
                 result = submit_application(form, request.user)
@@ -197,7 +198,7 @@ def business_application_detail(request, application_id):
         "term_months": version.term_months,
         "purpose": version.purpose,
     }
-    revision_form = ApplicationForm(request.POST or None, initial=initial)
+    revision_form = ApplicationForm(request.POST or None, request.FILES or None, initial=initial)
     if request.method == "POST":
         if not can_edit:
             raise PermissionDenied("Заявка сейчас недоступна для доработки")
@@ -220,6 +221,8 @@ def business_application_detail(request, application_id):
             "client_comments": application.comments.filter(
                 audience=ApplicationComment.Audience.CLIENT
             ),
+            "documents": version.documents.all(),
+            "processing_job": DocumentProcessingJob.objects.filter(version=version).first(),
             "active_cabinet": "business-applications",
         },
     )
@@ -300,6 +303,11 @@ def bank_application_detail(request, application_id):
                     messages.success(request, "Статус заявки обновлён")
                     return redirect("bank-application-detail", application_id=application.pk)
     version = application.versions.get(version_number=application.current_version)
+    processing_job = (
+        DocumentProcessingJob.objects.filter(version=version)
+        .prefetch_related("serialized_documents__source_document")
+        .first()
+    )
     return render(
         request,
         "credit_applications/bank_application_detail.html",
@@ -308,6 +316,8 @@ def bank_application_detail(request, application_id):
             "version": version,
             "action_form": action_form,
             "comment_form": comment_form,
+            "documents": version.documents.all(),
+            "processing_job": processing_job,
             "active_cabinet": "bank",
         },
     )

@@ -1,31 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Регистрация · Альфа-Банк Бизнес{% endblock %}
 {% block content %}
-<main class="mx-auto grid min-h-[calc(100vh-69px)] max-w-[1440px] lg:grid-cols-[.9fr_1.1fr]">
-  <section class="hidden flex-col justify-center bg-[#eef1f3] px-16 lg:flex xl:px-24">
-    <p class="text-[12px] font-semibold text-brand-500">АЛЬФА-БАНК БИЗНЕС</p>
-    <h1 class="mt-5 max-w-lg text-[46px] font-bold leading-[1.08] tracking-[-.045em]">Один аккаунт для всех заявок бизнеса</h1>
-    <p class="mt-5 max-w-md text-[16px] leading-7 text-ink-500">После регистрации вы сможете заполнить анкету, отслеживать статус и отвечать на вопросы банка.</p>
-    <div class="mt-9 space-y-3 text-sm">
-      <p class="flex items-center gap-3"><span class="grid size-7 place-items-center rounded-full bg-white text-emerald-600">✓</span>Заявки доступны только вашему аккаунту</p>
-      <p class="flex items-center gap-3"><span class="grid size-7 place-items-center rounded-full bg-white text-emerald-600">✓</span>Банковский кабинет защищён отдельной ролью</p>
+<main class="public-shell public-shell--register">
+  <section class="public-story">
+    <div class="public-story__inner">
+      <p class="eyebrow">Кабинет компании</p>
+      <h1>Все заявки бизнеса — в одном месте.</h1>
+      <p class="public-story__lead">Создайте личный аккаунт. Компания подключается отдельно — только после подтверждения права представителя.</p>
+      <ol class="public-steps" aria-label="Этапы начала работы">
+        <li><span>01</span><p><strong>Создайте аккаунт</strong><small>Понадобятся имя, email и пароль</small></p></li>
+        <li><span>02</span><p><strong>Подтвердите компанию</strong><small>Присоединение по одному ИНН исключено</small></p></li>
+        <li><span>03</span><p><strong>Подайте заявку</strong><small>Статус и вопросы банка будут в кабинете</small></p></li>
+      </ol>
     </div>
   </section>
-  <section class="grid place-items-center bg-[#f7f8f9] px-5 py-10">
-    <div class="w-full max-w-[570px] rounded-2xl bg-white p-7 shadow-[0_20px_60px_rgba(7,16,31,.07)] sm:p-10" x-data="{ submitting: false }">
-      <div class="flex items-start justify-between gap-5"><div><p class="text-[11px] font-semibold uppercase tracking-[.14em] text-brand-500">Новый клиент</p><h2 class="mt-2 text-[28px] font-bold tracking-[-.035em]">Создайте аккаунт</h2><p class="mt-2 text-sm text-ink-500">Для представителя компании или ИП</p></div><span class="rounded-full bg-canvas px-3 py-1.5 text-[10px] text-ink-500">≈ 2 минуты</span></div>
-      <form method="post" class="mt-7" @submit="submitting = true">
+  <section class="auth-side">
+    <div class="auth-card auth-card--wide" x-data="{ submitting: false }">
+      <p class="eyebrow">Новый клиент</p>
+      <h2>Создать аккаунт</h2>
+      <p class="auth-card__lead">Для владельца или уполномоченного представителя бизнеса.</p>
+      <form method="post" class="form-stack" @submit="submitting = true">
         {% csrf_token %}
-        {% if form.non_field_errors %}<div class="mb-5 rounded-[10px] bg-brand-50 px-4 py-3 text-[12px] text-brand-600">{{ form.non_field_errors }}</div>{% endif %}
-        <div class="grid gap-5 sm:grid-cols-2">{% include "credit_applications/field.html" with field=form.first_name %}{% include "credit_applications/field.html" with field=form.last_name %}</div>
-        <div class="mt-5">{% include "credit_applications/field.html" with field=form.email %}</div>
-        <div class="mt-5 grid gap-5 sm:grid-cols-2">{% include "credit_applications/field.html" with field=form.password1 %}{% include "credit_applications/field.html" with field=form.password2 %}</div>
-        <p class="mt-3 text-[11px] leading-5 text-ink-500">Не менее 8 символов. Не используйте простой или полностью цифровой пароль.</p>
-        <button :disabled="submitting" class="mt-6 h-12 w-full rounded-[10px] bg-brand-500 text-sm font-bold text-white transition hover:bg-brand-600 disabled:opacity-60"><span x-show="!submitting">Создать аккаунт</span><span x-cloak x-show="submitting">Создаём…</span></button>
+        {% if form.non_field_errors %}<div class="error-box">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid">{% include "credit_applications/field.html" with field=form.first_name %}{% include "credit_applications/field.html" with field=form.last_name %}</div>
+        {% include "credit_applications/field.html" with field=form.email %}
+        <div class="form-grid">{% include "credit_applications/field.html" with field=form.password1 %}{% include "credit_applications/field.html" with field=form.password2 %}</div>
+        <p class="form-help">Не менее 8 символов. Не используйте простой или полностью цифровой пароль.</p>
+        <button type="submit" :disabled="submitting" class="button button--primary button--wide"><span x-show="!submitting">Создать аккаунт</span><span x-cloak x-show="submitting">Создаём…</span></button>
       </form>
-      <p class="mt-6 text-center text-sm text-ink-500">Уже зарегистрированы? <a href="{% url 'login' %}" class="font-semibold text-ink-950 hover:text-brand-500">Войти</a></p>
+      <p class="auth-switch">Уже зарегистрированы? <a href="{% url 'login' %}">Войти</a></p>
     </div>
   </section>
 </main>
 {% endblock %}
-

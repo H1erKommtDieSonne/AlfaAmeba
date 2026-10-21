@@ -1,8 +1,25 @@
 from django.urls import path
 
 from . import views
+from . import llm_api
 
 urlpatterns = [
+    path("api/v1/llm/jobs/claim/", llm_api.claim_job, name="llm-job-claim"),
+    path(
+        "api/v1/llm/jobs/<uuid:job_id>/documents/<uuid:document_id>/",
+        llm_api.download_job_document,
+        name="llm-job-document",
+    ),
+    path(
+        "api/v1/llm/jobs/<uuid:job_id>/complete/",
+        llm_api.complete_job_view,
+        name="llm-job-complete",
+    ),
+    path(
+        "api/v1/llm/jobs/<uuid:job_id>/fail/",
+        llm_api.fail_job_view,
+        name="llm-job-fail",
+    ),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("", views.business_cabinet, name="business-cabinet"),
     path("applications/", views.business_applications, name="business-applications"),

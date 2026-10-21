@@ -1,20 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Заявка отправлена · Альфа-Банк Бизнес{% endblock %}
 {% block content %}
-<main class="mx-auto grid min-h-[calc(100vh-69px)] max-w-[1440px] place-items-center px-5 py-12">
-  <section class="w-full max-w-[620px] rounded-2xl border border-line bg-white p-7 text-center shadow-[0_18px_55px_rgba(7,16,31,.06)] sm:p-11">
-    <span class="mx-auto grid size-16 place-items-center rounded-full bg-emerald-50 text-3xl text-emerald-600">✓</span>
-    <p class="mt-6 text-[11px] font-semibold uppercase tracking-[.14em] text-brand-500">Заявка отправлена</p>
-    <h1 class="mt-3 text-[30px] font-bold tracking-[-.04em]">Банк получил версию №{{ version.version_number }}</h1>
-    <p class="mx-auto mt-3 max-w-md text-sm leading-6 text-ink-500">Снимок заявки сохранён. Изменения после отправки потребуют новой версии.</p>
-    <dl class="my-8 grid overflow-hidden rounded-xl bg-[#f7f8f9] text-left sm:grid-cols-3">
-      <div class="p-4"><dt class="text-[10px] text-ink-500">Номер</dt><dd class="mt-1 text-[13px] font-bold">{{ application.id|stringformat:"s"|slice:":8"|upper }}</dd></div>
-      <div class="border-line p-4 sm:border-x"><dt class="text-[10px] text-ink-500">Сумма</dt><dd class="mt-1 text-[13px] font-bold">{{ version.amount|floatformat:"0g" }} ₽</dd></div>
-      <div class="p-4"><dt class="text-[10px] text-ink-500">Срок</dt><dd class="mt-1 text-[13px] font-bold">{{ version.term_months }} мес.</dd></div>
-    </dl>
-    <a href="{% url 'business-application-detail' application.id %}" class="grid h-12 w-full place-items-center rounded-[10px] bg-brand-500 text-sm font-bold text-white hover:bg-brand-600">Открыть заявку</a>
-    <a href="{% url 'business-cabinet' %}" class="mt-4 inline-block text-sm font-medium text-ink-700 hover:text-brand-500">Создать ещё одну заявку</a>
-    {% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="mt-4 inline-block text-sm font-medium text-ink-700 hover:text-brand-500">Перейти в кабинет банка</a>{% endif %}
+<main class="result-page">
+  <section class="result-card">
+    <p class="result-index">01 / Отправлено</p>
+    <div class="result-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9"/></svg></div>
+    <p class="eyebrow">Заявка принята</p>
+    <h1>Версия №{{ version.version_number }} передана в банк</h1>
+    <p class="result-lead">Снимок заявки сохранён. Если банк запросит изменения, новая отправка создаст следующую версию.</p>
+    <dl class="summary-grid"><div><dt>Номер</dt><dd>{{ application.id|stringformat:"s"|slice:":8"|upper }}</dd></div><div><dt>Сумма</dt><dd>{{ version.amount|floatformat:"0g" }} ₽</dd></div><div><dt>Срок</dt><dd>{{ version.term_months }} мес.</dd></div></dl>
+    <div class="result-actions"><a href="{% url 'business-application-detail' application.id %}" class="button button--decision">Открыть заявку</a><a href="{% url 'business-cabinet' %}" class="button button--secondary">Создать ещё одну</a>{% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="button button--secondary">Кабинет банка</a>{% endif %}</div>
   </section>
 </main>
 {% endblock %}
+
