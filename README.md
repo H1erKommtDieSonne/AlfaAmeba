@@ -36,45 +36,6 @@ SUBMITTED → IN_REVIEW → NEEDS_REVISION → SUBMITTED
 - администратор банка управляет доступом и не видит очередь заявок;
 - внутренние комментарии никогда не отображаются представителю бизнеса.
 
-## Что загружать в Git
-
-В репозиторий загружаются исходный код, миграции, шаблоны и файлы зависимостей:
-
-```text
-assets/
-config/
-credit_applications/
-infra/
-ml/
-models/.gitkeep
-templates/
-.dockerignore
-.env.example
-.gitignore
-Dockerfile
-compose.yaml
-manage.py
-package.json
-package-lock.json
-pyproject.toml
-README.md
-```
-
-Локальные зависимости, секреты, база SQLite и собранные статические файлы не загружаются. Они уже перечислены в `.gitignore`:
-
-```text
-node_modules/
-.venv/
-.npm-cache/
-.env
-*.db
-__pycache__/
-static/css/app.css
-static/js/app.js
-media/
-models/*
-```
-
 ## Первая публикация на GitHub
 
 Создайте пустой репозиторий на GitHub, затем выполните из корня проекта:
