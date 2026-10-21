@@ -1,0 +1,39 @@
+{% extends "core/base.html" %}
+{% block title %}Доступы · Альфа-Банк Бизнес{% endblock %}
+{% block content %}
+<main class="workspace">
+  <aside class="sidebar">
+    <p class="sidebar__scope"><strong>Управление доступом</strong>Служебный раздел банка</p>
+    <p class="sidebar__group">Разделы</p>
+    <nav class="sidebar__nav" aria-label="Разделы управления">
+      <a href="{% url 'bank-admin-dashboard' %}" class="is-active">Запросы и пользователи</a>
+      <a href="{% url 'bank-queue' %}">Кредитные заявки</a>
+    </nav>
+    <p class="sidebar__group">Система</p>
+    <nav class="sidebar__nav"><a href="/admin/">Django Admin</a></nav>
+  </aside>
+
+  <section class="workspace-main">
+    <header class="page-header"><div><p class="breadcrumb">Банк / Администрирование</p><h1>Управление доступом</h1><p>Подтверждение полномочий и обзор пользователей системы</p></div></header>
+    <dl class="stats-strip">
+      <div class="stat"><dt>Ожидают проверки</dt><dd>{{ pending_access_count }}</dd></div>
+      <div class="stat"><dt>Всего пользователей</dt><dd>{{ total_users }}</dd></div>
+      <div class="stat"><dt>Представители бизнеса</dt><dd>{{ business_users }}</dd></div>
+      <div class="stat"><dt>Сотрудники банка</dt><dd>{{ bank_users }}</dd></div>
+    </dl>
+
+    <section class="panel panel--decision">
+      <div class="panel__header"><div><h2>Запросы на доступ к организациям</h2><p>ИНН сам по себе не подтверждает право представителя.</p></div><span class="status status--warning">{{ pending_access_count }} ожидают</span></div>
+      {% if pending_access_requests %}
+        <div class="access-list">{% for item in pending_access_requests %}
+          <article class="access-row">
+            <div><strong>{{ item.organization.name }}</strong><small>ИНН {{ item.organization.inn }}</small></div>
+            <div><strong>{{ item.user.get_full_name|default:item.user.email }}</strong><small>{{ item.user.email }} · {{ item.created_at|date:"d.m.Y H:i" }}</small></div>
+            <form method="post" action="{% url 'review-access-request' item.id %}" class="access-actions">{% csrf_token %}<input name="note" class="form-control" placeholder="Комментарий к решению"><button name="action" value="approve" class="button button--decision">Подтвердить</button><button name="action" value="reject" class="button button--secondary">Отклонить</button></form>
+          </article>
+        {% endfor %}</div>
+      {% else %}<div class="empty-state"><h2>Все запросы разобраны</h2><p>Новые запросы представителей появятся здесь.</p></div>{% endif %}
+    </section>
+  </section>
+</main>
+{% endblock %}

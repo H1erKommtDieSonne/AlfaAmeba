@@ -22,15 +22,12 @@ services:
       python manage.py collectstatic --noinput &&
       gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"
     environment:
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_NAME: ${POSTGRES_DB:-credit}
-      DATABASE_USER: ${POSTGRES_USER:-credit}
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-credit}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.prod}
+      DATABASE_URL: postgres://${POSTGRES_USER:-credit}:${POSTGRES_PASSWORD:-credit}@postgres:5432/${POSTGRES_DB:-credit}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-unsafe-docker-development-key}
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,django}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-false}
       ML_SERVICE_URL: http://ml:9000
       LLM_SERVICE_TOKEN: ${LLM_SERVICE_TOKEN:-change-me-local-llm-token}
       LLM_JOB_LEASE_SECONDS: ${LLM_JOB_LEASE_SECONDS:-600}

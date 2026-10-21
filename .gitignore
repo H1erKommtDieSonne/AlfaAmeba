@@ -5,13 +5,13 @@ __pycache__/
 *.py[cod]
 *.db
 *.egg-info/
-node_modules/
-.npm-cache/
 .taste-skill/
 staticfiles/
-static/css/app.css
-static/js/app.js
 media/
 models/*
 !models/.gitkeep
 
+# Tailwind: бинарник у каждого свой, под свою ОС (см. README), а CSS собирается из theme/input.css
+/tailwindcss.exe
+/tailwindcss
+/core/static/core/css/app.css
