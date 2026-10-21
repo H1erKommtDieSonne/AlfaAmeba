@@ -1,0 +1,16 @@
+{% extends "core/base.html" %}
+{% block title %}Заявка отправлена · Альфа-Банк Бизнес{% endblock %}
+{% block content %}
+<main class="result-page">
+  <section class="result-card">
+    <p class="result-index">01 / Отправлено</p>
+    <div class="result-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9"/></svg></div>
+    <p class="eyebrow">Заявка принята</p>
+    <h1>Версия №{{ version.version_number }} передана в банк</h1>
+    <p class="result-lead">Снимок заявки сохранён. Если банк запросит изменения, новая отправка создаст следующую версию.</p>
+    <dl class="summary-grid"><div><dt>Номер</dt><dd>{{ application.id|stringformat:"s"|slice:":8"|upper }}</dd></div><div><dt>Сумма</dt><dd>{{ version.amount|floatformat:"0g" }} ₽</dd></div><div><dt>Срок</dt><dd>{{ version.term_months }} мес.</dd></div></dl>
+    <div class="result-actions"><a href="{% url 'business-application-detail' application.id %}" class="button button--decision">Открыть заявку</a><a href="{% url 'business-cabinet' %}" class="button button--secondary">Создать ещё одну</a>{% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="button button--secondary">Кабинет банка</a>{% endif %}</div>
+  </section>
+</main>
+{% endblock %}
+

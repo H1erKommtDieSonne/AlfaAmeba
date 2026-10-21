@@ -120,7 +120,25 @@ git remote add origin https://github.com/USERNAME/REPOSITORY.git
 git push -u origin main
 ```
 
-Замените `USERNAME/REPOSITORY` на адрес своего репозитория. Перед коммитом проверьте через `git status`, что в список не попали `.env`, `.venv`, `node_modules` и `credit_scoring.db`.
+Замените `USERNAME/REPOSITORY` на адрес своего репозитория. Перед коммитом проверьте через `git status`, что в список не попали `.env`, `.venv`, `tailwindcss.exe` и `credit_scoring.db`.
+
+## Структура проекта
+
+Устроено по образцу [knt-portal](https://github.com/Nepike/knt-portal): настройки разделены по окружениям, код — по приложениям. У каждого приложения свои `urls.py` (подключаются в `config/urls.py`), шаблоны в `<app>/templates/<app>/`, сервисы, админка и тесты.
+
+| Приложение | Что в нём |
+| --- | --- |
+| `config` | Проект: `settings/base.py` (общее), `settings/dev.py` (разработка), `settings/prod.py` (Docker), корневые `urls.py` и `wsgi.py` |
+| `core` | Общий каркас: `base.html`, фрагменты, страница 403, подсветка раздела в шапке (`nav.py`), статика и Alpine.js, `dashboard`, команда `seed_demo`, общая обвязка тестов |
+| `users` | Своя модель `User`: вход по email без учёта регистра, поле `role`; вход, регистрация, проверки прав по роли (`users/permissions.py`) |
+| `organizations` | Организации, членство с ролями, запросы доступа и их рассмотрение администратором банка |
+| `products` | Каталог кредитных продуктов |
+| `applications` | Заявки, неизменяемые версии, комментарии, журнал событий; кабинет бизнеса и очередь банка |
+| `documents` | Документы версий заявки и pull-очередь для ML/LLM с API `/api/v1/llm/` |
+
+Окружение выбирает `DJANGO_SETTINGS_MODULE`: `manage.py` и `wsgi.py` по умолчанию берут `config.settings.dev`, Docker-образ — `config.settings.prod`. Переменные читаются через django-environ из окружения и из `.env` в корне проекта.
+
+Фронтенд собирается без Node.js. CSS — standalone-бинарником Tailwind из `theme/input.css` в `core/static/core/css/app.css` (результат не коммитится). Alpine.js лежит в репозитории (`core/static/core/vendor/alpine.min.js`), компоненты — в `core/static/core/js/app.js`.
 
 ## Запуск после клонирования
 
@@ -138,6 +156,8 @@ docker compose ps
 ```
 
 Откройте `http://127.0.0.1:8080`. Миграции и `collectstatic` выполняются автоматически перед запуском Gunicorn.
+
+После перехода на структуру по приложениям миграции созданы заново, и база, поднятая на прежней версии, с ними несовместима. Если она у вас осталась, один раз выполните `docker compose down -v` (удалит синтетические данные и загруженные файлы), поднимите проект заново и повторите `seed_demo`. Без Docker — удалите `credit_scoring.db`.
 
 Контейнеры разделены так:
 
@@ -160,7 +180,9 @@ docker compose down
 
 ### Локальный запуск без Docker
 
-На компьютере должны быть установлены Git, Python 3.12 или новее и Node.js. Для чистой установки в Windows PowerShell:
+На компьютере должны быть установлены Git и Python 3.12 или новее. Node.js не нужен: CSS собирает standalone-бинарник Tailwind. Скачайте `tailwindcss-windows-x64.exe` версии 4.3.1 со [страницы релизов](https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.1) и положите в корень проекта под именем `tailwindcss.exe` — он уже в `.gitignore`. На macOS и Linux возьмите `tailwindcss-macos-arm64` или `tailwindcss-linux-x64`, сохраните как `tailwindcss` и выполните `chmod +x tailwindcss`.
+
+Для чистой установки в Windows PowerShell:
 
 ```powershell
 git clone https://github.com/USERNAME/REPOSITORY.git
@@ -170,9 +192,7 @@ python -m venv .venv
 & ".\.venv\Scripts\python.exe" -m pip install --upgrade pip
 & ".\.venv\Scripts\python.exe" -m pip install -e ".[dev]"
 
-npm install
-New-Item -ItemType Directory -Force static\css, static\js
-npm run build
+.\tailwindcss.exe -i theme/input.css -o core/static/core/css/app.css --minify
 
 & ".\.venv\Scripts\python.exe" manage.py migrate
 & ".\.venv\Scripts\python.exe" manage.py seed_demo
@@ -197,7 +217,7 @@ npm run build
 Для параллельной работы со стилями:
 
 ```powershell
-npm run css:watch
+.\tailwindcss.exe -i theme/input.css -o core/static/core/css/app.css --watch
 ```
 
 ## Проверки
@@ -205,12 +225,13 @@ npm run css:watch
 ```powershell
 & ".\.venv\Scripts\python.exe" manage.py test
 & ".\.venv\Scripts\python.exe" manage.py check
-npm run build
+& ".\.venv\Scripts\python.exe" manage.py makemigrations --check --dry-run
+.\tailwindcss.exe -i theme/input.css -o core/static/core/css/app.css --minify
 ```
 
 ## База данных
 
-Без Docker проект по умолчанию использует SQLite. В Docker используется PostgreSQL; параметры берутся из `.env`. Сам PostgreSQL доступен только контейнеру Django по внутренней Docker-сети.
+Без Docker проект по умолчанию использует SQLite (`credit_scoring.db`); другую базу задаёт переменная `DATABASE_URL`. В Docker используется PostgreSQL: `compose.yaml` собирает `DATABASE_URL` из `POSTGRES_*` в `.env`. Сам PostgreSQL доступен только контейнеру Django по внутренней Docker-сети.
 
 Второй продукт — «Контрактный кредит» — пока рабочая демо-гипотеза и требует продуктового подтверждения.
 

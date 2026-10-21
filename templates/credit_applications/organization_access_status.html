@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block title %}Подтверждение организации · Альфа-Банк Бизнес{% endblock %}
-{% block content %}
-<main class="content-main content-main--narrow">
-  <header class="page-header"><div><p class="breadcrumb">Кабинет бизнеса / Доступ</p><h1>Подтверждение полномочий</h1><p>ИНН не даёт доступ к организации автоматически. Банк должен подтвердить право действовать от её имени.</p></div></header>
-  <div class="stack">{% for item in access_requests %}<article class="panel"><div class="panel__header"><div><h2>{{ item.organization.name }}</h2><p>ИНН {{ item.organization.inn }} · запрос от {{ item.created_at|date:"d.m.Y H:i" }}</p></div><span class="status {% if item.status == 'APPROVED' %}status--positive{% elif item.status == 'REJECTED' %}status--negative{% else %}status--warning{% endif %}">{{ item.get_status_display }}</span></div>{% if item.review_note or item.status == 'APPROVED' %}<div class="panel__body">{% if item.review_note %}<p class="review-note">{{ item.review_note }}</p>{% endif %}{% if item.status == 'APPROVED' %}<a href="{% url 'business-cabinet' %}" class="button button--decision">Перейти к заявке</a>{% endif %}</div>{% endif %}</article>{% empty %}<section class="panel"><div class="empty-state"><h2>Запросов пока нет</h2><p>Запрос появится после выбора компании.</p></div></section>{% endfor %}</div>
-</main>
-{% endblock %}
-

@@ -5,8 +5,9 @@ __pycache__
 *.py[cod]
 *.db
 *.egg-info
-node_modules
-.npm-cache
 staticfiles
 media
 models
+tailwindcss.exe
+tailwindcss
+core/static/core/css/app.css
