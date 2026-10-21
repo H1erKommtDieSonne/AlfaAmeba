@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
-from .models import Product
+from .models import ApplicationComment, Product
 
 
 INPUT_CLASS = (
@@ -130,4 +130,59 @@ class ApplicationForm(forms.Form):
                 f"Для этого продукта срок от {product.min_term_months} до {product.max_term_months} месяцев",
             )
         return data
+
+
+class ReviewActionForm(forms.Form):
+    ACTION_TAKE = "take"
+    ACTION_REQUEST_REVISION = "request_revision"
+    ACTION_SEND_TO_APPROVAL = "send_to_approval"
+    ACTION_APPROVE = "approve"
+    ACTION_DECLINE = "decline"
+    ACTION_RETURN_TO_REVIEW = "return_to_review"
+
+    action = forms.ChoiceField(
+        choices=(
+            (ACTION_TAKE, "Взять в работу"),
+            (ACTION_REQUEST_REVISION, "Вернуть на доработку"),
+            (ACTION_SEND_TO_APPROVAL, "Передать на согласование"),
+            (ACTION_APPROVE, "Одобрить"),
+            (ACTION_DECLINE, "Отклонить"),
+            (ACTION_RETURN_TO_REVIEW, "Вернуть сотруднику"),
+        ),
+        widget=forms.HiddenInput,
+    )
+    note = forms.CharField(
+        label="Комментарий",
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(
+            attrs={"class": INPUT_CLASS.replace("h-12", "min-h-24 py-3"), "rows": 3}
+        ),
+    )
+
+    def clean(self):
+        data = super().clean()
+        if data.get("action") in {
+            self.ACTION_REQUEST_REVISION,
+            self.ACTION_DECLINE,
+            self.ACTION_RETURN_TO_REVIEW,
+        } and len((data.get("note") or "").strip()) < 3:
+            self.add_error("note", "Для этого действия укажите причину")
+        return data
+
+
+class CommentForm(forms.Form):
+    text = forms.CharField(
+        label="Комментарий",
+        min_length=3,
+        max_length=2000,
+        widget=forms.Textarea(
+            attrs={"class": INPUT_CLASS.replace("h-12", "min-h-24 py-3"), "rows": 3}
+        ),
+    )
+    audience = forms.ChoiceField(
+        label="Кому виден комментарий",
+        choices=ApplicationComment.Audience.choices,
+        widget=forms.Select(attrs={"class": INPUT_CLASS}),
+    )
 

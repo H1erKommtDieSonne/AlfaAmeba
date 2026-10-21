@@ -14,6 +14,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = []
 postgres = ["psycopg[binary]>=3.2,<4"]
+docker = [
+  "gunicorn>=23,<24",
+  "psycopg[binary]>=3.2,<4",
+]
 
 [tool.setuptools]
 py-modules = []

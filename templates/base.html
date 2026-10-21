@@ -19,7 +19,7 @@
 
       {% if user.is_authenticated %}
       <nav class="ml-10 hidden h-full items-center gap-8 text-[12px] font-medium text-ink-500 md:flex" aria-label="Основная навигация">
-        {% if can_submit_applications %}<a href="{% url 'business-cabinet' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'business' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Новая заявка</a>{% endif %}
+        {% if can_submit_applications %}<a href="{% url 'business-applications' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'business-applications' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Мои заявки</a><a href="{% url 'business-cabinet' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'business' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Новая заявка</a>{% endif %}
         {% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'bank' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Заявки</a>{% endif %}
         {% if can_manage_bank %}<a href="{% url 'bank-admin-dashboard' %}" class="flex h-full items-center border-b-2 {% if active_cabinet == 'bank-admin' %}border-brand-500 text-ink-950{% else %}border-transparent hover:text-ink-950{% endif %}">Администрирование</a>{% endif %}
       </nav>
@@ -30,7 +30,7 @@
         <div class="relative">
           <button type="button" @click="open = !open" @click.outside="open = false" class="flex items-center gap-3 rounded-xl p-1.5 hover:bg-canvas" :aria-expanded="open">
             <span class="grid size-9 place-items-center rounded-full bg-[#eef0f2] text-[11px] font-bold text-ink-700">{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
-            <span class="hidden text-left lg:block"><strong class="block text-[12px] font-semibold">{{ user.get_full_name|default:user.email }}</strong><small class="block max-w-40 truncate text-[10px] text-ink-500">{% if can_manage_bank %}Администратор банка{% elif can_review_applications %}Сотрудник банка{% else %}Представитель бизнеса{% endif %}</small></span>
+            <span class="hidden text-left lg:block"><strong class="block text-[12px] font-semibold">{{ user.get_full_name|default:user.email }}</strong><small class="block max-w-40 truncate text-[10px] text-ink-500">{% if can_manage_bank %}Администратор банка{% elif can_approve_applications %}Старший согласующий{% elif can_process_applications %}Кредитный специалист{% else %}Представитель бизнеса{% endif %}</small></span>
             <svg viewBox="0 0 20 20" class="hidden size-4 fill-none stroke-current text-ink-500 lg:block"><path d="m6 8 4 4 4-4" stroke-width="1.5"/></svg>
           </button>
           <div x-cloak x-show="open" x-transition.origin.top.right class="absolute right-0 top-12 w-52 rounded-xl border border-line bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,.14)]">

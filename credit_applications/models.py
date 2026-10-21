@@ -9,7 +9,8 @@ from django.db import models
 class UserProfile(models.Model):
     class Role(models.TextChoices):
         BUSINESS = "BUSINESS", "Представитель бизнеса"
-        BANK_EMPLOYEE = "BANK_EMPLOYEE", "Сотрудник банка"
+        BANK_REVIEWER = "BANK_REVIEWER", "Кредитный специалист"
+        SENIOR_APPROVER = "SENIOR_APPROVER", "Старший согласующий"
         BANK_ADMIN = "BANK_ADMIN", "Администратор банка"
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="profile", on_delete=models.CASCADE)
@@ -17,6 +18,99 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user} — {self.get_role_display()}"
+
+
+class Organization(models.Model):
+    class VerificationStatus(models.TextChoices):
+        PENDING = "PENDING", "Ожидает проверки"
+        VERIFIED = "VERIFIED", "Проверена"
+        NEEDS_REVIEW = "NEEDS_REVIEW", "Требует уточнения"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200, validators=[MinLengthValidator(2)])
+    inn = models.CharField(
+        max_length=12,
+        unique=True,
+        validators=[RegexValidator(r"^(\d{10}|\d{12})$", "ИНН должен содержать 10 или 12 цифр")],
+    )
+    verification_status = models.CharField(
+        max_length=24,
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return f"{self.name} ({self.inn})"
+
+
+class OrganizationMembership(models.Model):
+    class Role(models.TextChoices):
+        OWNER = "OWNER", "Владелец"
+        EDITOR = "EDITOR", "Редактор"
+        SUBMITTER = "SUBMITTER", "Отправитель"
+        VIEWER = "VIEWER", "Наблюдатель"
+
+    organization = models.ForeignKey(
+        Organization, related_name="memberships", on_delete=models.CASCADE
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="organization_memberships", on_delete=models.CASCADE
+    )
+    role = models.CharField(max_length=24, choices=Role.choices, default=Role.VIEWER)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("organization", "user"), name="unique_organization_membership"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} — {self.organization} ({self.get_role_display()})"
+
+
+class OrganizationAccessRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Ожидает подтверждения"
+        APPROVED = "APPROVED", "Подтверждён"
+        REJECTED = "REJECTED", "Отклонён"
+
+    organization = models.ForeignKey(
+        Organization, related_name="access_requests", on_delete=models.CASCADE
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="organization_access_requests", on_delete=models.CASCADE
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="reviewed_organization_access_requests",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    review_note = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("organization", "user"), name="unique_organization_access_request"
+            )
+        ]
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user} → {self.organization} ({self.get_status_display()})"
 
 
 class Product(models.Model):
@@ -41,12 +135,29 @@ class Application(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Черновик"
         SUBMITTED = "SUBMITTED", "Отправлена"
+        IN_REVIEW = "IN_REVIEW", "На рассмотрении"
+        NEEDS_REVISION = "NEEDS_REVISION", "Требует доработки"
+        PENDING_APPROVAL = "PENDING_APPROVAL", "На согласовании"
+        APPROVED = "APPROVED", "Одобрена"
+        DECLINED = "DECLINED", "Отклонена"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="credit_applications",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    organization = models.ForeignKey(
+        Organization,
+        related_name="applications",
+        on_delete=models.PROTECT,
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="assigned_credit_applications",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
@@ -58,6 +169,8 @@ class Application(models.Model):
     )
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.DRAFT, db_index=True)
     current_version = models.PositiveIntegerField(default=1)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -96,4 +209,55 @@ class ApplicationVersion(models.Model):
         if self.pk and type(self).objects.filter(pk=self.pk, submitted_at__isnull=False).exists():
             raise ValidationError("Отправленную версию заявки нельзя изменять")
         return super().save(*args, **kwargs)
+
+
+class ApplicationComment(models.Model):
+    class Audience(models.TextChoices):
+        CLIENT = "CLIENT", "Клиенту"
+        INTERNAL = "INTERNAL", "Только банку"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(Application, related_name="comments", on_delete=models.CASCADE)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="application_comments", on_delete=models.PROTECT
+    )
+    audience = models.CharField(max_length=16, choices=Audience.choices)
+    text = models.TextField(validators=[MinLengthValidator(3)])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at",)
+
+    def __str__(self):
+        return f"Комментарий к {self.application_id} от {self.author}"
+
+
+class ApplicationEvent(models.Model):
+    class Type(models.TextChoices):
+        SUBMITTED = "SUBMITTED", "Заявка отправлена"
+        ASSIGNED = "ASSIGNED", "Назначен сотрудник"
+        STATUS_CHANGED = "STATUS_CHANGED", "Статус изменён"
+        COMMENT_ADDED = "COMMENT_ADDED", "Добавлен комментарий"
+        REVISION_SUBMITTED = "REVISION_SUBMITTED", "Доработка отправлена"
+
+    application = models.ForeignKey(Application, related_name="events", on_delete=models.CASCADE)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="application_events",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    event_type = models.CharField(max_length=32, choices=Type.choices)
+    from_status = models.CharField(max_length=32, blank=True)
+    to_status = models.CharField(max_length=32, blank=True)
+    message = models.CharField(max_length=500, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at",)
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} — {self.application_id}"
 

@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from credit_applications.models import Product, UserProfile
+from credit_applications.models import Organization, OrganizationMembership, Product, UserProfile
 
 
 PRODUCTS = (
@@ -39,19 +39,41 @@ class Command(BaseCommand):
                 code=item["code"], defaults={**item, "active": True}
             )
             self.stdout.write(f"{'Создан' if created else 'Обновлён'}: {product.name}")
-        self.create_demo_user(
+        business_user = self.create_demo_user(
             email="business@example.test",
             password="DemoPass123!",
             first_name="Анна",
             last_name="Волкова",
             role=UserProfile.Role.BUSINESS,
         )
+        organization, _ = Organization.objects.get_or_create(
+            inn="7707083893",
+            defaults={
+                "name": "ООО Север",
+                "verification_status": Organization.VerificationStatus.VERIFIED,
+            },
+        )
+        if organization.verification_status != Organization.VerificationStatus.VERIFIED:
+            organization.verification_status = Organization.VerificationStatus.VERIFIED
+            organization.save(update_fields=("verification_status", "updated_at"))
+        OrganizationMembership.objects.update_or_create(
+            organization=organization,
+            user=business_user,
+            defaults={"role": OrganizationMembership.Role.OWNER, "is_active": True},
+        )
         self.create_demo_user(
             email="bank@example.test",
             password="DemoPass123!",
             first_name="Илья",
             last_name="Соколов",
-            role=UserProfile.Role.BANK_EMPLOYEE,
+            role=UserProfile.Role.BANK_REVIEWER,
+        )
+        self.create_demo_user(
+            email="senior@example.test",
+            password="DemoPass123!",
+            first_name="Сергей",
+            last_name="Петров",
+            role=UserProfile.Role.SENIOR_APPROVER,
         )
         self.create_demo_user(
             email="admin@example.test",
@@ -75,4 +97,5 @@ class Command(BaseCommand):
         user.save()
         UserProfile.objects.update_or_create(user=user, defaults={"role": role})
         self.stdout.write(f"Демо-пользователь готов: {email}")
+        return user
 

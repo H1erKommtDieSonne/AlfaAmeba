@@ -53,7 +53,18 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 def database_config():
-    value = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'credit_scoring.db'}")
+    value = os.getenv("DATABASE_URL")
+    if not value and os.getenv("DATABASE_HOST"):
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DATABASE_NAME", "credit"),
+            "USER": os.getenv("DATABASE_USER", "credit"),
+            "PASSWORD": os.getenv("DATABASE_PASSWORD", ""),
+            "HOST": os.environ["DATABASE_HOST"],
+            "PORT": os.getenv("DATABASE_PORT", "5432"),
+            "CONN_MAX_AGE": 60,
+        }
+    value = value or f"sqlite:///{BASE_DIR / 'credit_scoring.db'}"
     parsed = urlparse(value)
     if parsed.scheme in {"postgres", "postgresql"}:
         return {
@@ -84,7 +95,17 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://127.0.0.1:9000")
+CSRF_TRUSTED_ORIGINS = [
+    item.strip()
+    for item in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if item.strip()
+]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"

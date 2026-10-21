@@ -12,7 +12,8 @@
       <div class="border-line p-4 sm:border-x"><dt class="text-[10px] text-ink-500">Сумма</dt><dd class="mt-1 text-[13px] font-bold">{{ version.amount|floatformat:"0g" }} ₽</dd></div>
       <div class="p-4"><dt class="text-[10px] text-ink-500">Срок</dt><dd class="mt-1 text-[13px] font-bold">{{ version.term_months }} мес.</dd></div>
     </dl>
-    <a href="{% url 'business-cabinet' %}" class="grid h-12 w-full place-items-center rounded-[10px] bg-brand-500 text-sm font-bold text-white hover:bg-brand-600">Создать ещё одну заявку</a>
+    <a href="{% url 'business-application-detail' application.id %}" class="grid h-12 w-full place-items-center rounded-[10px] bg-brand-500 text-sm font-bold text-white hover:bg-brand-600">Открыть заявку</a>
+    <a href="{% url 'business-cabinet' %}" class="mt-4 inline-block text-sm font-medium text-ink-700 hover:text-brand-500">Создать ещё одну заявку</a>
     {% if can_review_applications %}<a href="{% url 'bank-queue' %}" class="mt-4 inline-block text-sm font-medium text-ink-700 hover:text-brand-500">Перейти в кабинет банка</a>{% endif %}
   </section>
 </main>

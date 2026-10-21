@@ -10,4 +10,7 @@ node_modules/
 staticfiles/
 static/css/app.css
 static/js/app.js
+media/
+models/*
+!models/.gitkeep
 
