@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY assets ./assets
+COPY templates ./templates
+COPY credit_applications ./credit_applications
 RUN mkdir -p static/css static/js && npm run build
 
 
