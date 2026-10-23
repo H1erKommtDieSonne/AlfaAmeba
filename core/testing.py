@@ -51,10 +51,11 @@ class CreditTestCase(TestCase):
             "organization_name": "ООО Север",
             "inn": "7707083893",
             "product": self.product.pk,
+            "need": "working",
             "amount": "1500000.00",
             "term_months": "12",
             "purpose": "Закупка сезонной партии товара на три месяца",
-            "documents": [
+            "document_statement": [
                 SimpleUploadedFile(
                     "account-statement.pdf",
                     b"%PDF-1.4 synthetic statement",

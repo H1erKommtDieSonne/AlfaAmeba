@@ -4,11 +4,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
-COPY server.py ./server.py
-COPY queue_client.py ./queue_client.py
+COPY requirements.txt /app/ml/requirements.txt
+RUN pip install --no-cache-dir -r /app/ml/requirements.txt
+COPY . /app/ml/
 
 RUN useradd --system ml
 USER ml
 EXPOSE 9000
 
-CMD ["python", "server.py"]
+CMD ["python", "-m", "ml.server"]

@@ -13,7 +13,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = []
+dev = ["pypdf>=5,<7", "openpyxl>=3.1,<4", "defusedxml>=0.7,<1"]
+analysis = ["pypdf>=5,<7", "openpyxl>=3.1,<4", "defusedxml>=0.7,<1"]
 postgres = ["psycopg[binary]>=3.2,<4"]
 docker = [
   "gunicorn>=23,<24",

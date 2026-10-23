@@ -34,6 +34,9 @@ class LlmQueueTests(CreditTestCase):
         self.assertEqual(claimed.status_code, 200)
         job_payload = claimed.json()
         self.assertEqual(job_payload["documents"][0]["document_id"], str(document.pk))
+        self.assertEqual(job_payload["documents"][0]["requirement_code"], "statement")
+        self.assertEqual(job_payload["application"]["needs"]["need"], "working")
+        self.assertEqual(job_payload["application"]["checklist"][0]["status"], "uploaded")
 
         empty_queue = self.client.post(
             reverse("llm-job-claim"),

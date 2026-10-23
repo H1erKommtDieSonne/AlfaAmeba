@@ -17,6 +17,7 @@ class ApplicationDocument(models.Model):
     )
     file = models.FileField(upload_to=application_document_path, max_length=255)
     original_name = models.CharField(max_length=255)
+    requirement_code = models.CharField(max_length=64, blank=True)
     content_type = models.CharField(max_length=120)
     size = models.PositiveBigIntegerField()
     sha256 = models.CharField(max_length=64, db_index=True)

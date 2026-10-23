@@ -1,0 +1,8 @@
+{% if version.snapshot.recommendation %}
+<section class="panel"><div class="panel__header"><h2>Подбор и комплект документов</h2></div><div class="panel__body">
+  <p>{{ version.snapshot.recommendation.message }}</p>
+  {% for item in version.snapshot.recommendation.items %}<p><strong>{{ item.name }}</strong> — {{ item.reason }}</p>{% endfor %}
+  <ul>{% for item in version.snapshot.checklist %}<li>{{ item.name }} — {% if item.status == 'uploaded' %}загружено, ожидает проверки{% else %}не загружено{% endif %}</li>{% endfor %}</ul>
+  <p class="muted-copy">Демонстрационные правила {{ version.snapshot.recommendation.rules_version }}. Состав пакета сохранён на момент отправки.</p>
+</div></section>
+{% endif %}

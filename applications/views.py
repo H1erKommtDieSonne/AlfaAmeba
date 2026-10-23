@@ -2,11 +2,16 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
+from django.http import JsonResponse
+from django import forms
+from django.views.decorators.http import require_GET
 from django.shortcuts import get_object_or_404, redirect, render
 
 from documents.models import DocumentProcessingJob
 from organizations.models import OrganizationAccessRequest
 from products.models import Product
+from products.advisor import recommend, requirements
+from .advisor_forms import NeedsForm
 from users.permissions import (
     can_approve_applications,
     can_review_applications,
@@ -22,6 +27,28 @@ from .services import (
     submit_application,
     submit_revision,
 )
+
+
+@login_required
+@require_GET
+def financing_advice(request):
+    if not can_submit_applications(request.user):
+        raise PermissionDenied("Подбор доступен клиентам")
+    form = NeedsForm(request.GET)
+    form.is_valid()
+    data = dict(form.cleaned_data)
+    for name, field in [("amount", forms.DecimalField(min_value=1, max_digits=14, decimal_places=2, required=False)),
+                        ("term_months", forms.IntegerField(min_value=1, max_value=120, required=False))]:
+        try:
+            data[name] = field.clean(request.GET.get(name))
+        except ValidationError:
+            return JsonResponse({"error": "Укажите корректную сумму и срок."}, status=400)
+    products = list(Product.objects.filter(active=True))
+    result = recommend(data, products)
+    selected = next((p for p in products if p.code == request.GET.get("product")), None)
+    result["checklist"] = requirements(selected.code, data.get("collateral", False)) if selected else []
+    result["selection_matches"] = bool(selected and any(item["code"] == selected.code and item["available"] for item in result["items"]))
+    return JsonResponse(result)
 
 
 @login_required
@@ -122,8 +149,11 @@ def business_application_detail(request, application_id):
         "amount": version.amount,
         "term_months": version.term_months,
         "purpose": version.purpose,
+        **(version.snapshot or {}).get("needs", {}),
     }
-    revision_form = ApplicationForm(request.POST or None, request.FILES or None, initial=initial)
+    revision_form = ApplicationForm(request.POST if request.method == "POST" else None,
+                                    request.FILES if request.method == "POST" else None,
+                                    initial=initial, previous_version=version)
     if request.method == "POST":
         if not can_edit:
             raise PermissionDenied("Заявка сейчас недоступна для доработки")

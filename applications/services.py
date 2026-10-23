@@ -25,6 +25,9 @@ def _snapshot(data, *, version_number, submitted_at):
         "amount": str(data["amount"]),
         "term_months": data["term_months"],
         "purpose": data["purpose"],
+        "needs": {key: data.get(key) for key in ("need", "gap_kind", "debt_kind", "collateral")},
+        "recommendation": data["recommendation"],
+        "checklist": data["checklist"],
         "version": version_number,
         "submitted_at": submitted_at.isoformat(),
     }
@@ -57,7 +60,7 @@ def submit_application(form: ApplicationForm, user) -> Application | Organizatio
         submitted_at=submitted_at,
         snapshot=_snapshot(data, version_number=1, submitted_at=submitted_at),
     )
-    save_documents_and_enqueue(version, data["documents"])
+    save_documents_and_enqueue(version, data["document_uploads"], data["retained_documents"])
     ApplicationEvent.objects.create(
         application=application,
         actor=user,
@@ -104,7 +107,7 @@ def submit_revision(application: Application, form: ApplicationForm, user) -> Ap
         submitted_at=submitted_at,
         snapshot=_snapshot(data, version_number=version_number, submitted_at=submitted_at),
     )
-    save_documents_and_enqueue(version, data["documents"])
+    save_documents_and_enqueue(version, data["document_uploads"], data["retained_documents"])
     application.current_version = version_number
     application.status = Application.Status.SUBMITTED
     application.submitted_at = submitted_at
