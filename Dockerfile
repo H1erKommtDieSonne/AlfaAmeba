@@ -26,7 +26,7 @@ WORKDIR /app
 RUN groupadd --system django && useradd --system --gid django django
 
 COPY pyproject.toml ./
-RUN python -m pip install --upgrade pip && python -m pip install ".[docker]"
+RUN python -m pip install --upgrade pip && python -m pip install ".[docker,analysis]"
 
 COPY . .
 COPY --from=frontend /app/core/static/core/css/app.css ./core/static/core/css/app.css

@@ -4,11 +4,13 @@ from django import forms
 
 from core.forms import INPUT_CLASS, MultipleFileField, MultipleFileInput
 from products.models import Product
+from products.advisor import DOCUMENTS, recommend, requirements
+from .advisor_forms import NeedsForm
 
 from .models import ApplicationComment
 
 
-class ApplicationForm(forms.Form):
+class ApplicationForm(NeedsForm):
     ALLOWED_DOCUMENT_EXTENSIONS = {
         ".pdf",
         ".png",
@@ -62,7 +64,8 @@ class ApplicationForm(forms.Form):
         widget=forms.Textarea(attrs={"class": INPUT_CLASS, "rows": 3}),
     )
     documents = MultipleFileField(
-        label="Документы",
+        required=False,
+        label="Дополнительные документы (необязательно)",
         help_text="PDF, изображения, таблицы или DOCX — до 20 МБ каждый и 50 МБ суммарно",
         widget=MultipleFileInput(
             attrs={
@@ -72,9 +75,27 @@ class ApplicationForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, previous_version=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.previous_version = previous_version
         self.fields["product"].queryset = Product.objects.filter(active=True)
+        for code, (name, reason) in DOCUMENTS.items():
+            existing = previous_version.documents.filter(requirement_code=code).exists() if previous_version else False
+            self.fields[f"document_{code}"] = MultipleFileField(
+                label=name, required=False, help_text=reason,
+                widget=MultipleFileInput(attrs={"class": "form-control", "accept": ".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,.docx",
+                                               "x-bind:required": f"requires('{code}') && {'false' if existing else 'true'}"}),
+            )
+
+    @property
+    def document_fields(self):
+        return [{"code": code, "field": self[f"document_{code}"],
+                 "existing": list(self.previous_version.documents.filter(requirement_code=code)) if self.previous_version else []}
+                for code in DOCUMENTS]
+
+    @property
+    def has_document_errors(self):
+        return any(name == "documents" or name.startswith("document_") for name in self.errors)
 
     def clean(self):
         data = super().clean()
@@ -91,6 +112,36 @@ class ApplicationForm(forms.Form):
                 "term_months",
                 f"Для этого продукта срок от {product.min_term_months} до {product.max_term_months} месяцев",
             )
+        data["recommendation"] = recommend(data, self.fields["product"].queryset)
+        if product and data.get("need") and not any(
+            item["code"] == product.code and item["available"] for item in data["recommendation"]["items"]
+        ):
+            self.add_error("product", "Выберите доступный вариант из подбора или уточните задачу, сумму и срок.")
+        data["checklist"] = requirements(product.code, data.get("collateral", False)) if product else []
+        retained = []
+        if self.previous_version and not data.get("documents"):
+            retained.extend(self.previous_version.documents.filter(requirement_code=""))
+        uploads = [("", file) for file in data.get("documents", [])]
+        for code in DOCUMENTS:
+            fresh = data.get(f"document_{code}", [])
+            uploads.extend((code, file) for file in fresh)
+            if self.previous_version and not fresh:
+                retained.extend(self.previous_version.documents.filter(requirement_code=code))
+        for item in data["checklist"]:
+            item["status"] = "uploaded" if any(code == item["code"] for code, _ in uploads) or any(doc.requirement_code == item["code"] for doc in retained) else "missing"
+            if item["status"] == "missing":
+                self.add_error(f"document_{item['code']}", "Прикрепите документ для выбранного продукта.")
+        total_size = sum(file.size for _, file in uploads)
+        for code, file in uploads:
+            field = f"document_{code}" if code else "documents"
+            if Path(file.name).suffix.lower() not in self.ALLOWED_DOCUMENT_EXTENSIONS:
+                self.add_error(field, "Формат файла не поддерживается")
+            if file.size > self.MAX_DOCUMENT_SIZE:
+                self.add_error(field, "Размер файла превышает 20 МБ")
+        if total_size + sum(doc.size for doc in retained) > self.MAX_DOCUMENTS_SIZE:
+            self.add_error(None, "Общий размер документов превышает 50 МБ")
+        data["document_uploads"] = uploads
+        data["retained_documents"] = retained
         return data
 
     def clean_documents(self):

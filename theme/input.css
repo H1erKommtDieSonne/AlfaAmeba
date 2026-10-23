@@ -288,6 +288,13 @@
   .field-legend { margin-bottom: 12px; color: var(--ink); font-size: 13px; font-weight: 600; }
   .product-option__meta { float: right; margin-left: 12px; color: var(--muted); font-size: 10px; font-weight: 600; }
   .form-section { margin-top: 20px; }
+  input[type="file"]::file-selector-button {
+    margin-right: 12px;
+    padding: 4px 10px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    cursor: pointer;
+  }
   .form-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; }
   .detail-grid--form { grid-template-columns: minmax(0, 1fr) 300px; }
   .form-topline { display: grid; grid-template-columns: 130px minmax(0, 1fr) 130px; align-items: center; margin-bottom: 34px; }

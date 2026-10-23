@@ -1,0 +1,27 @@
+<div class="form-section">
+  {% include "core/_field.html" with field=form.need %}
+  <div x-show="needValue === 'gap'">{% include "core/_field.html" with field=form.gap_kind %}</div>
+  <div x-show="needValue === 'debt'">{% include "core/_field.html" with field=form.debt_kind %}</div>
+  {% include "core/_field.html" with field=form.collateral %}
+</div>
+<section class="panel form-section" aria-live="polite" :aria-busy="adviceLoading">
+  <div class="panel__body">
+    <h3>Подбор по вашей задаче</h3>
+    <p>Демонстрационный подбор. Условия и список документов уточняет банк.</p>
+    <p x-show="adviceLoading">Обновляем варианты…</p>
+    <p class="form-error" x-show="adviceError" x-text="adviceError"></p>
+    <button x-show="adviceError" type="button" class="button button--secondary" @click="refreshAdvice()">Повторить подбор</button>
+    <p x-text="advice.message"></p>
+    <p x-show="advice.items.length && !advice.selection_matches">Выберите подходящий доступный продукт ниже, чтобы продолжить.</p>
+    <div class="stack">
+      <template x-for="item in advice.items" :key="item.code">
+        <article class="purpose-block">
+          <strong x-text="item.name"></strong><p x-text="item.reason"></p>
+          <p x-text="item.conditions"></p>
+          <p x-text="item.limitation"></p>
+          <button type="button" class="button button--secondary" :disabled="!item.available || adviceLoading" @click="chooseProduct(item.code)">Выбрать</button>
+        </article>
+      </template>
+    </div>
+  </div>
+</section>

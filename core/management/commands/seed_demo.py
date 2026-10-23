@@ -9,6 +9,18 @@ from users.models import User
 
 PRODUCTS = (
     {
+        "code": "investment", "name": "Инвестиционный кредит",
+        "description": "Демо: оборудование, ремонт и расширение бизнеса.",
+        "min_amount": Decimal("100000.00"), "max_amount": Decimal("30000000.00"),
+        "min_term_months": 6, "max_term_months": 60, "badge": "Демо-условия",
+    },
+    {
+        "code": "refinancing", "name": "Рефинансирование",
+        "description": "Демо: пересмотр действующих кредитов без просрочки.",
+        "min_amount": Decimal("100000.00"), "max_amount": Decimal("30000000.00"),
+        "min_term_months": 6, "max_term_months": 60, "badge": "Демо-условия",
+    },
+    {
         "code": "working-capital",
         "name": "Оборотный кредит",
         "description": "На закупку товара, сырья и текущие расходы бизнеса.",

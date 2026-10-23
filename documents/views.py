@@ -3,6 +3,8 @@ import secrets
 from functools import wraps
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
@@ -12,7 +14,21 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import ApplicationDocument, DocumentProcessingJob
-from .queue import claim_next_job, complete_job, fail_job
+from .queue import claim_next_job, complete_job, fail_job, renew_job
+
+
+@login_required
+@require_GET
+def download_document(request, document_id):
+    from applications.permissions import can_access_business_application
+    from users.permissions import can_review_applications
+
+    document = get_object_or_404(ApplicationDocument.objects.select_related("version__application"), pk=document_id)
+    if not (can_review_applications(request.user) or can_access_business_application(request.user, document.version.application)):
+        raise PermissionDenied("Документ недоступен")
+    document.file.open("rb")
+    return FileResponse(document.file, as_attachment=True, filename=document.original_name,
+                        content_type="application/octet-stream")
 
 
 def llm_service_required(view):
@@ -62,6 +78,7 @@ def claim_job(request):
         {
             "document_id": str(document.pk),
             "name": document.original_name,
+            "requirement_code": document.requirement_code,
             "content_type": document.content_type,
             "size": document.size,
             "sha256": document.sha256,
@@ -136,6 +153,20 @@ def complete_job_view(request, job_id):
             "completed_at": job.completed_at.isoformat(),
         }
     )
+
+
+@csrf_exempt
+@require_POST
+@llm_service_required
+def renew_job_view(request, job_id):
+    try:
+        payload = _json_body(request)
+        job = renew_job(job_id=job_id, lease_token=payload.get("lease_token"))
+    except DocumentProcessingJob.DoesNotExist:
+        return JsonResponse({"error": "Job not found"}, status=404)
+    except ValidationError as error:
+        return _validation_error(error)
+    return JsonResponse({"lease_expires_at": job.lease_expires_at.isoformat()})
 
 
 @csrf_exempt

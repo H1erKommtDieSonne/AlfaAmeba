@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 {% block title %}Новая заявка · Альфа-Банк Бизнес{% endblock %}
 {% block content %}
-<main class="content-main application-form" x-data="applicationWizard({% if form.documents.errors %}3{% elif form.product.errors or form.amount.errors or form.term_months.errors or form.purpose.errors %}2{% else %}1{% endif %}, '{{ form.product.value|default:'working-capital'|escapejs }}')">
+<main class="content-main application-form" x-data="applicationWizard({% if form.has_document_errors %}3{% elif form.errors %}2{% else %}1{% endif %}, '{{ form.product.value|default:'working-capital'|escapejs }}')">
   <div class="form-topline">
     <a href="{% url 'business-applications' %}" class="back-link">← Мои заявки</a>
     <ol class="progress-line" aria-label="Этапы заявки">
@@ -13,7 +13,7 @@
   </div>
 
   <header class="page-header"><div><p class="breadcrumb">Новая заявка · этап <span x-text="step"></span> из 4</p><h1 tabindex="-1" x-ref="stageHeading" x-text="titles[step]">Расскажите о компании</h1><p x-text="descriptions[step]">Укажите реквизиты компании, от имени которой подаётся заявка.</p></div></header>
-  <form x-ref="form" method="post" enctype="multipart/form-data" @submit="handleSubmit($event)" novalidate>
+  <form x-ref="form" x-data="needsAdvisor" data-advice-url="{% url 'financing-advice' %}" @change="refreshAdvice()" @input.debounce.300ms="refreshAdvice()" method="post" enctype="multipart/form-data" @submit="handleSubmit($event)" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="error-box">{{ form.non_field_errors }}</div>{% endif %}
     <div class="detail-grid detail-grid--form">
@@ -24,9 +24,9 @@
         </section>
 
         <section x-cloak class="panel panel--decision wizard-stage" data-form-step="2" x-show="step === 2" x-transition.opacity>
-          <div class="panel__header"><div><h2>Параметры кредита</h2><p>Выберите продукт и укажите желаемые условия</p></div></div>
+          <div class="panel__header"><div><h2>Задача и параметры финансирования</h2><p>Выберите продукт и укажите желаемые условия</p></div></div>
           <div class="panel__body">
-            <fieldset><legend class="field-legend">Кредитный продукт</legend>{% if form.product.errors %}<p class="form-error">{{ form.product.errors|striptags }}</p>{% endif %}
+            {% include "applications/_needs.html" %}<fieldset><legend class="field-legend">Кредитный продукт</legend>{% if form.product.errors %}<p class="form-error">{{ form.product.errors|striptags }}</p>{% endif %}
               <div class="product-options">
                 {% for choice in form.product.field.queryset %}
                   <label class="product-option" :class="product === '{{ choice.pk }}' ? 'is-selected' : ''">
@@ -42,12 +42,12 @@
         </section>
 
         <section x-cloak class="panel wizard-stage" data-form-step="3" x-show="step === 3" x-transition.opacity>
-          <div class="panel__header"><div><h2>Документы</h2><p>Файлы сохраняются вместе с этой версией заявки и передаются в очередь обработки.</p></div></div>
-          <div class="panel__body">{% include "core/_field.html" with field=form.documents %}</div>
+          <div class="panel__header"><div><h2>Документы</h2><p>Приложите документы по выбранному продукту.</p></div></div>
+          <div class="panel__body">{% include "applications/_checklist.html" %}</div>
         </section>
 
         <section x-cloak class="panel panel--decision wizard-stage" data-form-step="4" x-show="step === 4" x-transition.opacity>
-          <div class="panel__header"><div><h2>Всё готово к отправке</h2><p>После отправки заявка и документы появятся в очереди банка и LLM.</p></div></div>
+          <div class="panel__header"><div><h2>Всё готово к отправке</h2><p>После отправки банк получит заявку и приложенный комплект.</p></div></div>
           <div class="panel__body"><dl class="wizard-review">
             <div><dt>Организация</dt><dd x-text="fieldValue('id_organization_name')"></dd></div>
             <div><dt>ИНН</dt><dd x-text="fieldValue('id_inn')"></dd></div>
@@ -63,10 +63,10 @@
         <section x-show="showHint && step === 1" x-transition class="panel"><div class="panel__body note-block"><button type="button" @click="showHint=false" aria-label="Скрыть подсказку">×</button><h3>Используйте точные реквизиты</h3><p>Название должно совпадать с официальными данными организации.</p></div></section>
         <section x-cloak x-show="step === 2" x-transition class="panel"><div class="panel__body note-block"><h3>Заполните цель конкретно</h3><p>Опишите, что покупаете и на какой период — это ускоряет первичную проверку.</p></div></section>
         <section x-cloak x-show="step === 3" x-transition class="panel"><div class="panel__body note-block"><h3>Что можно приложить</h3><ul><li>выписку по расчётному счёту;</li><li>бухгалтерскую отчётность;</li><li>PDF, изображения, таблицы и DOCX.</li></ul></div></section>
-        <section x-cloak x-show="step === 4" x-transition class="panel"><div class="panel__body note-block"><h3>Начнётся обработка документов</h3><p>Заявка попадёт сотруднику банка, а документы — в защищённую очередь LLM.</p></div></section>
+        <section x-cloak x-show="step === 4" x-transition class="panel"><div class="panel__body note-block"><h3>Начнётся обработка документов</h3><p>Заявка попадёт сотруднику банка, а документы будут подготовлены к обработке.</p></div></section>
       </aside>
     </div>
-    <div class="form-actions"><div><button x-cloak x-show="step > 1" type="button" @click="previous()" class="button button--secondary">Назад</button><a x-show="step === 1" href="{% url 'business-applications' %}" class="button button--secondary">Отменить</a></div><button x-show="step < 4" type="button" @click="next()" class="button button--decision">Продолжить</button><button x-cloak x-show="step === 4" type="submit" :disabled="submitting" class="button button--decision"><span x-show="!submitting">Отправить заявку</span><span x-cloak x-show="submitting">Отправляем…</span></button></div>
+    <div class="form-actions"><div><button x-cloak x-show="step > 1" type="button" @click="previous()" class="button button--secondary">Назад</button><a x-show="step === 1" href="{% url 'business-applications' %}" class="button button--secondary">Отменить</a></div><button x-show="step < 4" type="button" :disabled="step === 2 && (adviceLoading || !!adviceError || !advice.selection_matches)" @click="next()" class="button button--decision">Продолжить</button><button x-cloak x-show="step === 4" type="submit" :disabled="submitting" class="button button--decision"><span x-show="!submitting">Отправить заявку</span><span x-cloak x-show="submitting">Отправляем…</span></button></div>
   </form>
 </main>
 {% endblock %}

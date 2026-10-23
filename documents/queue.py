@@ -23,6 +23,11 @@ def _locked_jobs(queryset):
 def claim_next_job(*, worker_id=""):
     now = timezone.now()
     DocumentProcessingJob.objects.filter(
+        status=DocumentProcessingJob.Status.PROCESSING, lease_expires_at__lt=now,
+        attempts__gte=F("max_attempts"),
+    ).update(status=DocumentProcessingJob.Status.FAILED, last_error="Истёк срок последней попытки обработки",
+             lease_token=None, lease_expires_at=None, claimed_by="", claimed_at=None)
+    DocumentProcessingJob.objects.filter(
         status=DocumentProcessingJob.Status.PROCESSING,
         lease_expires_at__lt=now,
     ).update(
@@ -82,6 +87,17 @@ def _validate_active_lease(job, lease_token):
 
 
 @transaction.atomic
+def renew_job(*, job_id, lease_token):
+    job = DocumentProcessingJob.objects.select_for_update().get(pk=job_id)
+    if job.status != DocumentProcessingJob.Status.PROCESSING:
+        raise ValidationError("Задача сейчас не обрабатывается")
+    _validate_active_lease(job, lease_token)
+    job.lease_expires_at = timezone.now() + timedelta(seconds=settings.LLM_JOB_LEASE_SECONDS)
+    job.save(update_fields=("lease_expires_at", "updated_at"))
+    return job
+
+
+@transaction.atomic
 def complete_job(*, job_id, lease_token, documents, summary=None):
     job = (
         DocumentProcessingJob.objects.select_for_update()
@@ -115,7 +131,7 @@ def complete_job(*, job_id, lease_token, documents, summary=None):
                 confidence = Decimal(str(confidence))
             except InvalidOperation as error:
                 raise ValidationError("confidence должен быть числом от 0 до 1") from error
-            if confidence < 0 or confidence > 1:
+            if not confidence.is_finite() or confidence < 0 or confidence > 1:
                 raise ValidationError("confidence должен быть числом от 0 до 1")
         SerializedDocument.objects.create(
             job=job,

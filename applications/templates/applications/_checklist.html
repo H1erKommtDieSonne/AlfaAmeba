@@ -1,0 +1,13 @@
+<p>Список зависит от выбранного продукта и обеспечения. Загрузка ещё не означает, что документ проверен.</p>
+<p>PDF, изображения, таблицы, DOCX: до 20 МБ на файл и 50 МБ на весь пакет.</p>
+<p x-show="!advice.checklist.length">Выберите продукт, чтобы увидеть необходимый комплект.</p>
+{% for item in form.document_fields %}
+  <div class="form-section" x-show="requires('{{ item.code }}') || hasFiles('{{ item.code }}')">
+    {% include "core/_field.html" with field=item.field %}
+    <p class="muted-copy">{{ item.field.help_text }}</p>
+    <p x-show="!requires('{{ item.code }}')">Сохранится как дополнительный документ: для текущего продукта не требуется.</p>
+    <p x-text="uploadStatus('{{ item.code }}', {{ item.existing|length }})"></p>
+    {% if item.existing %}<p>Уже приложено: {% for document in item.existing %}{{ document.original_name }}{% if not forloop.last %}, {% endif %}{% endfor %}. Без новой загрузки эти файлы перейдут в следующую версию. Новая загрузка заменит этот пункт.</p>{% endif %}
+  </div>
+{% endfor %}
+<div class="form-section">{% include "core/_field.html" with field=form.documents %}</div>

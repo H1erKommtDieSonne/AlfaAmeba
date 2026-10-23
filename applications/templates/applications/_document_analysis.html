@@ -1,0 +1,33 @@
+{% if processing_job.status == 'COMPLETED' %}
+<section class="panel">
+  <div class="panel__header"><h2>Результаты разбора документов</h2></div>
+  <div class="panel__body">
+    <p>Это автоматические подсказки. Принятие документов и решение по заявке остаются за сотрудником банка.</p>
+    {% if processing_job.result_summary.analysis_version %}
+      <p>Файлов: {{ processing_job.result_summary.document_count }}. С замечаниями: {{ processing_job.result_summary.review_count }}.</p>
+      <ul>{% for item in processing_job.result_summary.checklist %}
+        <li>{{ item.name }} — {% if item.status == 'EXTRACTED' %}текст извлечён, ожидает проверки сотрудником{% elif item.status == 'MISSING' %}документ не приложен{% else %}нужно уточнение или ручная проверка{% endif %}</li>
+      {% endfor %}</ul>
+    {% endif %}
+    {% for result in processing_job.serialized_documents.all %}
+      <article class="form-section">
+        <h3>{{ result.source_document.original_name }}</h3>
+        <p><a href="{% url 'document-download' result.source_document_id %}">Скачать исходный документ</a></p>
+        {% if result.schema_version == 'document-checks-1' %}
+          <p>Тип по содержимому: {{ result.payload.type_label }}.</p>
+          <p>{% if result.payload.status == 'EXTRACTED' %}Текст извлечён. Автоматические правила не нашли расхождений; это не подтверждение достоверности.{% else %}Нужна проверка{% endif %}</p>
+          {% for finding in result.payload.findings %}
+            <div class="purpose-block"><strong>{{ finding.message }}</strong>
+            {% if finding.text %}<p>{{ finding.location }}: «{{ finding.text }}»</p>{% endif %}</div>
+          {% endfor %}
+          {% for field in result.payload.fields %}<p><strong>{{ field.name }}:</strong> {{ field.value }} · {{ field.location }}</p>{% endfor %}
+          {% if result.payload.evidence %}<details><summary>На основании каких фрагментов определён тип</summary>
+            {% for item in result.payload.evidence %}<p>{{ item.location }}: «{{ item.text }}»</p>{% endfor %}
+          </details>{% endif %}
+        {% else %}<p>Структурированный результат получен в формате {{ result.schema_version }}.</p>{% endif %}
+      </article>
+    {% endfor %}
+    <p class="muted-copy">Обработано {{ processing_job.completed_at|date:"d.m.Y H:i" }} · {{ processing_job.result_summary.analysis_version }}</p>
+  </div>
+</section>
+{% endif %}
