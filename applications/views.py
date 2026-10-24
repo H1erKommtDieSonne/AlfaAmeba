@@ -1,23 +1,33 @@
 import json
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django import forms
 from django.views.decorators.http import require_GET
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from analytics.services import current_analysis_run
 from documents.models import DocumentProcessingJob
+from node_integration.financial import financial_view
+from node_integration.forms import FinancialInputsForm, statement_formset
+from node_integration.models import FinancialInputs
 from node_integration.presentation import node_review
+from node_integration.services import NodeJobBusy, request_recalculation
+from node_integration.services import latest_completed_job as latest_completed_node_job
+from node_integration.services import latest_job as latest_node_job
 from organizations.models import OrganizationAccessRequest
 from products.models import Product
-from products.advisor import recommend, requirements
+from products.advisor import NEEDS, recommend, requirements
 from .advisor_forms import NeedsForm
 from users.permissions import (
     can_approve_applications,
+    can_process_applications,
     can_review_applications,
     can_submit_applications,
 )
@@ -160,11 +170,15 @@ def _analysis_view(run):
     return view
 
 
-def _node_job_for(version):
-    """Задание внешнего узла для версии заявки (интеграция обязательна)."""
-    from node_integration.models import NodeJob
+def _node_jobs(version):
+    """(последняя попытка узла, попытка, чей результат показываем).
 
-    return NodeJob.objects.filter(version=version).first()
+    Пока пересчёт после подтверждения данных в работе, показываем прошлый готовый
+    результат, а не пустую карточку; если готового нет — последнюю попытку.
+    """
+    latest = latest_node_job(version)
+    shown = latest_completed_node_job(version) or latest
+    return latest, shown
 
 
 def _feedback_groups(queryset):
@@ -197,21 +211,63 @@ def _feedback_groups(queryset):
     return groups
 
 
-def _document_feedback_context(application):
-    """Замечания узла: текущая выбранная версия и история более старых версий."""
+def _document_feedback_context(application, job):
+    """Замечания узла: к показываемой попытке текущей версии и вся остальная история.
+
+    В историю попадают и прошлые версии, и прошлые попытки текущей версии: их
+    замечания относятся к другому набору данных и за текущие выдаваться не должны.
+    """
     from node_integration.models import NodeFeedback
 
-    current_number = application.current_version
-    current_qs = NodeFeedback.objects.filter(
-        job__version__application=application,
-        job__version__version_number=current_number,
-    ).order_by("created_at", "feedback_id")
+    feedback = NodeFeedback.objects.filter(job__version__application=application)
+    current_qs = feedback.filter(job=job).order_by("created_at", "feedback_id") if job else feedback.none()
     history_qs = (
-        NodeFeedback.objects.filter(job__version__application=application)
-        .exclude(job__version__version_number=current_number)
-        .order_by("-created_at", "-job__version__version_number", "feedback_id")
-    )
+        feedback.exclude(job=job) if job else feedback
+    ).order_by("-created_at", "-job__version__version_number", "feedback_id")
     return _feedback_groups(current_qs), _feedback_groups(history_qs)
+
+
+def _local_findings(processing_job):
+    """Замечания локального разбора документов (схема document-checks-1) одним списком с файлом и местом."""
+    if processing_job is None or processing_job.status != "COMPLETED":
+        return []
+    findings = []
+    for result in processing_job.serialized_documents.all():
+        if result.schema_version != "document-checks-1" or not isinstance(result.payload, dict):
+            continue
+        for finding in result.payload.get("findings") or []:
+            if not isinstance(finding, dict) or not finding.get("message"):
+                continue
+            findings.append({
+                "message": str(finding["message"]),
+                "filename": result.source_document.original_name,
+                "locator": str(finding.get("location") or ""),
+                "quote": str(finding.get("text") or ""),
+            })
+    return findings
+
+
+def _remarks(financial, feedback_current, processing_job):
+    """Замечания к документам одним списком: от узла и от локального разбора.
+
+    Полный список узла лежит в его результате; отдельный feedback — его же урезанная
+    копия, она нужна, только пока результата нет (порядок доставки не гарантирован).
+    """
+    if financial and financial.get("state") == "ready":
+        remarks = list(financial["issues"])
+    else:
+        remarks = [issue for group in feedback_current for issue in group["issues"]]
+    return remarks + _local_findings(processing_job)
+
+
+def _client_needs(version):
+    """Задача клиента из снимка версии: что он хотел сделать и предлагал ли залог."""
+    snapshot = version.snapshot if isinstance(version.snapshot, dict) else {}
+    needs = snapshot.get("needs") if isinstance(snapshot.get("needs"), dict) else {}
+    return {
+        "need": dict(NEEDS).get(needs.get("need"), ""),
+        "collateral": needs.get("collateral") is True,
+    }
 
 
 def _node_result_json(node_job):
@@ -360,8 +416,8 @@ def business_application_detail(request, application_id):
             else:
                 messages.success(request, "Новая версия заявки отправлена в банк")
                 return redirect("business-application-detail", application_id=application.pk)
-    feedback_current, feedback_history = _document_feedback_context(application)
-    node_job = _node_job_for(version)
+    _, node_job = _node_jobs(version)
+    feedback_current, feedback_history = _document_feedback_context(application, node_job)
     return render(
         request,
         "applications/business_application_detail.html",
@@ -383,21 +439,45 @@ def business_application_detail(request, application_id):
     )
 
 
-@login_required
-def bank_queue(request):
-    if not can_review_applications(request.user):
-        raise PermissionDenied("Банковская очередь доступна только сотрудникам банка")
-    selected_status = request.GET.get("status", "")
-    if can_approve_applications(request.user) and not selected_status:
+def _bank_queue(user, status):
+    """Очередь банка с фильтром по статусу: общая для списка и для листания в карточке."""
+    selected_status = status or ""
+    if can_approve_applications(user) and not selected_status:
         selected_status = Application.Status.PENDING_APPROVAL
     applications = (
         Application.objects.exclude(status=Application.Status.DRAFT)
         .select_related("assigned_to")
         .prefetch_related("versions__product")
-        .order_by("-updated_at")
+        .order_by("-updated_at", "id")
     )
     if selected_status in Application.Status.values:
         applications = applications.filter(status=selected_status)
+    return selected_status, applications
+
+
+def _queue_neighbours(user, status, application):
+    """Соседние заявки в той же выборке очереди: (предыдущая, следующая, позиция, всего).
+
+    Если заявка из выборки выпала (статус сменился), листать не от чего — только «К очереди».
+    """
+    _, applications = _bank_queue(user, status)
+    ids = list(applications.values_list("id", flat=True))
+    if application.pk not in ids:
+        return None
+    index = ids.index(application.pk)
+    return {
+        "previous": ids[index - 1] if index > 0 else None,
+        "next": ids[index + 1] if index + 1 < len(ids) else None,
+        "position": index + 1,
+        "total": len(ids),
+    }
+
+
+@login_required
+def bank_queue(request):
+    if not can_review_applications(request.user):
+        raise PermissionDenied("Банковская очередь доступна только сотрудникам банка")
+    selected_status, applications = _bank_queue(request.user, request.GET.get("status", ""))
     rows = [
         {
             "application": application,
@@ -434,15 +514,45 @@ def bank_application_detail(request, application_id):
         ),
         pk=application_id,
     )
+    # Фильтр очереди едет за сотрудником в карточку: по нему листаются соседние заявки
+    # и по нему же «К очереди» возвращает в ту же выборку.
+    queue_status = request.GET.get("status")
+    queue_query = f"?{urlencode({'status': queue_status})}" if queue_status is not None else ""
+    detail_url = reverse("bank-application-detail", args=[application.pk]) + queue_query
+    version = application.versions.get(version_number=application.current_version)
+    inputs = FinancialInputs.objects.filter(version=version).select_related("confirmed_by").first()
+    can_confirm_inputs = _can_confirm_inputs(request.user, application)
     action_form = ReviewActionForm()
     comment_form = CommentForm()
+    inputs_form = FinancialInputsForm(instance=inputs, version=version)
+    statements = statement_formset(version=version, inputs=inputs)
     if request.method == "POST":
         if request.POST.get("form_type") == "comment":
             comment_form = CommentForm(request.POST)
             if comment_form.is_valid():
                 add_comment(application, author=request.user, **comment_form.cleaned_data)
                 messages.success(request, "Комментарий добавлен")
-                return redirect("bank-application-detail", application_id=application.pk)
+                return redirect(detail_url)
+        elif request.POST.get("form_type") == "node_inputs":
+            if not can_confirm_inputs:
+                raise PermissionDenied("Подтверждать данные для расчёта может специалист, у которого заявка в работе")
+            inputs_form = FinancialInputsForm(request.POST, instance=inputs, version=version)
+            accounts = inputs_form.cleaned_data["accounts"] if inputs_form.is_valid() else ()
+            statements = statement_formset(request.POST, version=version, inputs=inputs, accounts=accounts)
+            if inputs_form.is_valid() and statements.is_valid():
+                with transaction.atomic():
+                    inputs_form.save(statements=statements.periods(), user=request.user)
+                    try:
+                        _, created = request_recalculation(version, user=request.user)
+                    except NodeJobBusy as error:
+                        messages.warning(request, f"Данные сохранены. {error}.")
+                    else:
+                        messages.success(
+                            request,
+                            "Данные сохранены, заявка поставлена на пересчёт узлом"
+                            if created else "Данные сохранены: узел получит их при отправке заявки",
+                        )
+                return redirect(detail_url)
         else:
             action_form = ReviewActionForm(request.POST)
             if action_form.is_valid():
@@ -457,16 +567,16 @@ def bank_application_detail(request, application_id):
                     action_form.add_error(None, error.message)
                 else:
                     messages.success(request, "Статус заявки обновлён")
-                    return redirect("bank-application-detail", application_id=application.pk)
-    version = application.versions.get(version_number=application.current_version)
+                    return redirect(detail_url)
     processing_job = (
         DocumentProcessingJob.objects.filter(version=version)
         .prefetch_related("serialized_documents__source_document")
         .first()
     )
     analysis_run = current_analysis_run(application)
-    node_job = _node_job_for(version)
-    feedback_current, feedback_history = _document_feedback_context(application)
+    node_job, shown_node_job = _node_jobs(version)
+    feedback_current, feedback_history = _document_feedback_context(application, shown_node_job)
+    financial = financial_view(shown_node_job)
     return render(
         request,
         "applications/bank_application_detail.html",
@@ -480,9 +590,28 @@ def bank_application_detail(request, application_id):
             "analysis_run": analysis_run,
             "analysis_view": _analysis_view(analysis_run),
             "node_job": node_job,
-            "node_result_json": _node_result_json(node_job),
-            "node_review": node_review(node_job),
+            "node_result_json": _node_result_json(shown_node_job),
+            "node_review": node_review(shown_node_job),
             "document_feedback_current": feedback_current,
             "document_feedback_history": feedback_history,
+            "queue_query": queue_query,
+            "queue_nav": _queue_neighbours(request.user, queue_status, application),
+            "financial": financial,
+            "recalculation": node_job if node_job and shown_node_job and node_job.pk != shown_node_job.pk else None,
+            "remarks": _remarks(financial, feedback_current, processing_job),
+            "client_needs": _client_needs(version),
+            "financial_inputs": inputs,
+            "can_confirm_inputs": can_confirm_inputs,
+            "inputs_form": inputs_form,
+            "statements": statements,
         },
+    )
+
+
+def _can_confirm_inputs(user, application):
+    """Данные для расчёта подтверждает специалист, у которого заявка в работе (как и решения по ней)."""
+    return (
+        can_process_applications(user)
+        and application.status == Application.Status.IN_REVIEW
+        and application.assigned_to_id in (None, user.pk)
     )

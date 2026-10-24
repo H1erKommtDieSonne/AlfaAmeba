@@ -1,0 +1,78 @@
+<section class="panel" id="node-inputs" aria-labelledby="node-inputs-title">
+  <div class="panel__header">
+    <div>
+      <h2 id="node-inputs-title">Данные для расчёта</h2>
+      <p>Что подтверждает сотрудник, а не модель: без этого узел не признает выписку полной и не учтёт платёж по новому кредиту</p>
+    </div>
+    {% if financial_inputs %}<span class="status status--positive">Подтверждено</span>{% else %}<span class="status status--warning">Не подтверждено</span>{% endif %}
+  </div>
+  <div class="panel__body">
+    {% if financial_inputs %}
+      <dl class="fact-list">
+        <div><dt>Ставка</dt><dd>{% if financial_inputs.annual_rate_percent is not None %}{{ financial_inputs.annual_rate_percent|floatformat:"-2" }} % годовых{% else %}не указана{% endif %}</dd></div>
+        <div><dt>Платёж по новому кредиту</dt><dd>{% if financial_inputs.proposed_monthly_payment_rub is not None %}{{ financial_inputs.proposed_monthly_payment_rub|floatformat:"0g" }}&nbsp;₽ в месяц{% else %}не указан{% endif %}</dd></div>
+        <div><dt>Расчётные счета клиента</dt><dd>{{ financial_inputs.expected_account_ids|join:", "|default:"не указаны" }}</dd></div>
+        <div><dt>Выписки с периодом и остатками</dt><dd>{{ financial_inputs.statement_periods|length }}</dd></div>
+        <div><dt>Долги</dt><dd>{{ financial_inputs.get_debt_status_display }}{% if financial_inputs.debt_status == 'COMPLETE' %}: {{ financial_inputs.debt_schedule_start|date:"d.m.Y" }} — {{ financial_inputs.debt_schedule_end|date:"d.m.Y" }}{% endif %}</dd></div>
+        <div><dt>Отчётный год</dt><dd>{{ financial_inputs.reporting_year|default:"последний полный" }}</dd></div>
+      </dl>
+      <p class="muted-copy side-panel__note">Подтвердил {{ financial_inputs.confirmed_by.get_full_name|default:financial_inputs.confirmed_by.email }} · {{ financial_inputs.confirmed_at|date:"d.m.Y H:i" }}</p>
+    {% else %}
+      <p class="muted-copy">Пока ничего не подтверждено — узел считает только по документам клиента.</p>
+    {% endif %}
+
+    {% if can_confirm_inputs %}
+      <details class="inputs-editor"{% if inputs_form.errors or statements.total_error_count or not financial_inputs %} open{% endif %}>
+        <summary>{% if financial_inputs %}Изменить и пересчитать{% else %}Заполнить и отправить на пересчёт{% endif %}</summary>
+        <form method="post" class="inputs-form" novalidate
+              x-data="{ debt: '{{ inputs_form.debt_status.value|default:'UNKNOWN'|escapejs }}' }"
+              @change="if ($event.target.name === 'debt_status') debt = $event.target.value">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="node_inputs">
+          {% if inputs_form.non_field_errors %}<div class="error-box">{{ inputs_form.non_field_errors }}</div>{% endif %}
+
+          <div class="form-grid">
+            <div>{% include "core/_field.html" with field=inputs_form.annual_rate_percent %}</div>
+            <div>{% include "core/_field.html" with field=inputs_form.proposed_monthly_payment_rub %}<p class="form-help">{{ inputs_form.proposed_monthly_payment_rub.help_text }}</p></div>
+          </div>
+
+          <div>{% include "core/_field.html" with field=inputs_form.accounts %}<p class="form-help">{{ inputs_form.accounts.help_text }}</p></div>
+
+          <fieldset class="statement-rows">
+            <legend class="field-legend">Выписки: период и остатки по данным банка</legend>
+            {{ statements.management_form }}
+            {% if statements.non_form_errors %}<div class="error-box">{{ statements.non_form_errors }}</div>{% endif %}
+            {% for row in statements %}
+              <div class="statement-row">
+                <div class="statement-row__file">{% include "core/_field.html" with field=row.filename %}</div>
+                {% include "core/_field.html" with field=row.account_id %}
+                {% include "core/_field.html" with field=row.period_start %}
+                {% include "core/_field.html" with field=row.period_end %}
+                {% include "core/_field.html" with field=row.opening_balance_rub %}
+                {% include "core/_field.html" with field=row.closing_balance_rub %}
+                <label class="checkbox-field">{{ row.complete }} {{ row.complete.label }}</label>
+              </div>
+            {% endfor %}
+            <p class="form-help">Остаток на начало + все поступления − все списания должен сойтись с остатком на конец: так узел признаёт месяцы полными.</p>
+          </fieldset>
+
+          <div class="form-grid">
+            <div>{% include "core/_field.html" with field=inputs_form.debt_status %}</div>
+            <div>{% include "core/_field.html" with field=inputs_form.reporting_year %}<p class="form-help">{{ inputs_form.reporting_year.help_text }}</p></div>
+          </div>
+          <div class="form-grid" x-show="debt === 'COMPLETE'"{% if inputs_form.debt_status.value != 'COMPLETE' %} x-cloak{% endif %}>
+            {% include "core/_field.html" with field=inputs_form.debt_schedule_start %}
+            {% include "core/_field.html" with field=inputs_form.debt_schedule_end %}
+          </div>
+
+          <button class="button button--decision">Сохранить и отправить на пересчёт</button>
+          <p class="muted-copy">Узел получит заявку заново вместе с этими данными. Пока он считает, в карточке остаётся прошлый результат.</p>
+        </form>
+      </details>
+    {% elif application.status == 'IN_REVIEW' %}
+      <p class="muted-copy side-panel__note">Подтвердить данные может кредитный специалист, у которого заявка в работе.</p>
+    {% else %}
+      <p class="muted-copy side-panel__note">Подтвердить данные можно, когда заявка в работе у кредитного специалиста.</p>
+    {% endif %}
+  </div>
+</section>

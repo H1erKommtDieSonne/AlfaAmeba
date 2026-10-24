@@ -1,0 +1,1433 @@
+{
+  "$defs": {
+    "AnalysisWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "fields"
+      ],
+      "title": "AnalysisWarning",
+      "type": "object"
+    },
+    "AnnualInput": {
+      "additionalProperties": false,
+      "properties": {
+        "metrics": {
+          "$ref": "#/$defs/AnnualMetrics"
+        },
+        "unit": {
+          "const": "RUB_THOUSANDS",
+          "title": "Unit",
+          "type": "string"
+        },
+        "currency": {
+          "const": "RUB",
+          "title": "Currency",
+          "type": "string"
+        },
+        "period_start": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period Start"
+        },
+        "period_end": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period End"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "As Of"
+        },
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "missing_fields": {
+          "items": {
+            "enum": [
+              "revenue",
+              "net_profit_current",
+              "operating_profit_current",
+              "total_assets",
+              "equity",
+              "current_assets",
+              "short_term_liabilities",
+              "cash",
+              "receivables",
+              "okved_group"
+            ],
+            "type": "string"
+          },
+          "title": "Missing Fields",
+          "type": "array"
+        },
+        "sources": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/Source"
+            },
+            "type": "array"
+          },
+          "propertyNames": {
+            "enum": [
+              "revenue",
+              "net_profit_current",
+              "operating_profit_current",
+              "total_assets",
+              "equity",
+              "current_assets",
+              "short_term_liabilities",
+              "cash",
+              "receivables",
+              "okved_group"
+            ]
+          },
+          "title": "Sources",
+          "type": "object"
+        }
+      },
+      "required": [
+        "metrics",
+        "unit",
+        "currency",
+        "period_start",
+        "period_end",
+        "as_of",
+        "ready",
+        "missing_fields",
+        "sources"
+      ],
+      "title": "AnnualInput",
+      "type": "object"
+    },
+    "AnnualMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "revenue": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Revenue"
+        },
+        "net_profit_current": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Net Profit Current"
+        },
+        "operating_profit_current": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operating Profit Current"
+        },
+        "total_assets": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Total Assets"
+        },
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Equity"
+        },
+        "current_assets": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Assets"
+        },
+        "short_term_liabilities": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Short Term Liabilities"
+        },
+        "cash": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cash"
+        },
+        "receivables": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Receivables"
+        },
+        "okved_group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Okved Group"
+        }
+      },
+      "required": [
+        "revenue",
+        "net_profit_current",
+        "operating_profit_current",
+        "total_assets",
+        "equity",
+        "current_assets",
+        "short_term_liabilities",
+        "cash",
+        "receivables",
+        "okved_group"
+      ],
+      "title": "AnnualMetrics",
+      "type": "object"
+    },
+    "ApplicationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "application_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Application Id"
+        },
+        "document_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Document Version"
+        },
+        "borrower_inn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Borrower Inn"
+        },
+        "loan_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loan Type"
+        },
+        "loan_amount_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loan Amount Rub"
+        },
+        "term_months": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Term Months"
+        },
+        "annual_rate_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Annual Rate Percent"
+        },
+        "has_collateral": {
+          "title": "Has Collateral",
+          "type": "boolean"
+        },
+        "analysis_date": {
+          "format": "date",
+          "title": "Analysis Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "application_id",
+        "document_version",
+        "borrower_inn",
+        "loan_type",
+        "loan_amount_rub",
+        "term_months",
+        "annual_rate_percent",
+        "has_collateral",
+        "analysis_date"
+      ],
+      "title": "ApplicationSummary",
+      "type": "object"
+    },
+    "Backtest": {
+      "additionalProperties": false,
+      "properties": {
+        "folds": {
+          "title": "Folds",
+          "type": "integer"
+        },
+        "mae_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mae Rub"
+        },
+        "mape_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mape Percent"
+        }
+      },
+      "required": [
+        "folds",
+        "mae_rub",
+        "mape_percent"
+      ],
+      "title": "Backtest",
+      "type": "object"
+    },
+    "CashFlowOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "const": "RUB",
+          "title": "Unit",
+          "type": "string"
+        },
+        "currency": {
+          "const": "RUB",
+          "title": "Currency",
+          "type": "string"
+        },
+        "months": {
+          "items": {
+            "$ref": "#/$defs/MonthlyAggregate"
+          },
+          "title": "Months",
+          "type": "array"
+        },
+        "complete_months": {
+          "title": "Complete Months",
+          "type": "integer"
+        },
+        "accounts_confirmed": {
+          "title": "Accounts Confirmed",
+          "type": "boolean"
+        },
+        "average_monthly_inflows_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Average Monthly Inflows Rub"
+        },
+        "average_monthly_outflows_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Average Monthly Outflows Rub"
+        },
+        "average_month_end_balance_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Average Month End Balance Rub"
+        },
+        "latest_observed_balance_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Observed Balance Rub"
+        },
+        "latest_observed_balance_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Observed Balance Date"
+        }
+      },
+      "required": [
+        "unit",
+        "currency",
+        "months",
+        "complete_months",
+        "accounts_confirmed",
+        "average_monthly_inflows_rub",
+        "average_monthly_outflows_rub",
+        "average_month_end_balance_rub",
+        "latest_observed_balance_rub",
+        "latest_observed_balance_date"
+      ],
+      "title": "CashFlowOutput",
+      "type": "object"
+    },
+    "ClientRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "required_for": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required For",
+          "type": "array"
+        },
+        "priority": {
+          "enum": [
+            "required",
+            "optional"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "upload_or_clarify",
+            "review_or_replace"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "filename": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filename"
+        }
+      },
+      "required": [
+        "code",
+        "title",
+        "message",
+        "fields",
+        "required_for",
+        "priority",
+        "action"
+      ],
+      "title": "ClientRequest",
+      "type": "object"
+    },
+    "DocumentField": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "enum": [
+            "RUB",
+            "RUB_THOUSANDS",
+            "TEXT",
+            "DATE",
+            "CODE",
+            "NUMBER"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "unit",
+        "source"
+      ],
+      "title": "DocumentField",
+      "type": "object"
+    },
+    "ForecastOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period"
+        },
+        "forecast_as_of": {
+          "format": "date",
+          "title": "Forecast As Of",
+          "type": "string"
+        },
+        "data_as_of": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Data As Of"
+        },
+        "horizon_months_after_last_observation": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Horizon Months After Last Observation"
+        },
+        "unit": {
+          "const": "RUB",
+          "title": "Unit",
+          "type": "string"
+        },
+        "method": {
+          "const": "mean_last_3_complete_consecutive_months",
+          "title": "Method",
+          "type": "string"
+        },
+        "scenarios": {
+          "items": {
+            "$ref": "#/$defs/ForecastScenario"
+          },
+          "title": "Scenarios",
+          "type": "array"
+        },
+        "backtest": {
+          "$ref": "#/$defs/Backtest"
+        },
+        "cash_gap_probability": {
+          "default": null,
+          "title": "Cash Gap Probability",
+          "type": "null"
+        },
+        "confidence_interval": {
+          "default": null,
+          "title": "Confidence Interval",
+          "type": "null"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "ready",
+        "period",
+        "forecast_as_of",
+        "data_as_of",
+        "horizon_months_after_last_observation",
+        "unit",
+        "method",
+        "scenarios",
+        "backtest",
+        "limitations"
+      ],
+      "title": "ForecastOutput",
+      "type": "object"
+    },
+    "ForecastScenario": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "base",
+            "cautious",
+            "stress"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "assumptions": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Assumptions",
+          "type": "object"
+        },
+        "customer_receipts_rub": {
+          "title": "Customer Receipts Rub",
+          "type": "number"
+        },
+        "operating_payments_rub": {
+          "title": "Operating Payments Rub",
+          "type": "number"
+        },
+        "existing_debt_service_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Existing Debt Service Rub"
+        },
+        "proposed_credit_payment_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposed Credit Payment Rub"
+        },
+        "starting_observed_balance_rub": {
+          "title": "Starting Observed Balance Rub",
+          "type": "number"
+        },
+        "opening_balance_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Opening Balance Rub"
+        },
+        "balance_after_existing_debt_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Balance After Existing Debt Rub"
+        },
+        "balance_after_all_debt_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Balance After All Debt Rub"
+        },
+        "cash_gap_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cash Gap Rub"
+        },
+        "projection_path": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Projection Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "assumptions",
+        "customer_receipts_rub",
+        "operating_payments_rub",
+        "existing_debt_service_rub",
+        "proposed_credit_payment_rub",
+        "starting_observed_balance_rub",
+        "opening_balance_rub",
+        "balance_after_existing_debt_rub",
+        "balance_after_all_debt_rub",
+        "cash_gap_rub",
+        "projection_path"
+      ],
+      "title": "ForecastScenario",
+      "type": "object"
+    },
+    "ModelOutputs": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "not_run",
+          "title": "Status",
+          "type": "string"
+        },
+        "forecast_revenue_rub_thousands": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Forecast Revenue Rub Thousands"
+        },
+        "safe_credit_limit_rub_thousands": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Safe Credit Limit Rub Thousands"
+        },
+        "net_margin_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Net Margin Percent"
+        },
+        "operating_margin_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operating Margin Percent"
+        },
+        "loss_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loss Probability Percent"
+        },
+        "liquidity_crisis_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Liquidity Crisis Probability Percent"
+        },
+        "default_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Default Probability Percent"
+        },
+        "approval_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approval Probability Percent"
+        },
+        "risk_grade": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Risk Grade"
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decision"
+        },
+        "operating_cash_flow_forecast_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operating Cash Flow Forecast Rub"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "forecast_revenue_rub_thousands",
+        "safe_credit_limit_rub_thousands",
+        "net_margin_percent",
+        "operating_margin_percent",
+        "loss_probability_percent",
+        "liquidity_crisis_probability_percent",
+        "default_probability_percent",
+        "approval_probability_percent",
+        "risk_grade",
+        "decision",
+        "operating_cash_flow_forecast_rub",
+        "note"
+      ],
+      "title": "ModelOutputs",
+      "type": "object"
+    },
+    "MonthlyAggregate": {
+      "additionalProperties": false,
+      "properties": {
+        "month": {
+          "title": "Month",
+          "type": "string"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "unit": {
+          "const": "RUB",
+          "title": "Unit",
+          "type": "string"
+        },
+        "accounts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Accounts",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "opening_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Opening Balance"
+        },
+        "closing_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Closing Balance"
+        },
+        "inflows": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Inflows"
+        },
+        "outflows": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outflows"
+        },
+        "customer_receipts": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Customer Receipts"
+        },
+        "operating_payments": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operating Payments"
+        },
+        "debt_service": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Debt Service"
+        },
+        "customer_breakdown": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Customer Breakdown"
+        }
+      },
+      "required": [
+        "month",
+        "complete",
+        "unit",
+        "accounts",
+        "sources",
+        "opening_balance",
+        "closing_balance",
+        "inflows",
+        "outflows",
+        "customer_receipts",
+        "operating_payments",
+        "debt_service",
+        "customer_breakdown"
+      ],
+      "title": "MonthlyAggregate",
+      "type": "object"
+    },
+    "Readiness": {
+      "additionalProperties": false,
+      "properties": {
+        "annual_model": {
+          "title": "Annual Model",
+          "type": "boolean"
+        },
+        "monthly_cash_flow": {
+          "title": "Monthly Cash Flow",
+          "type": "boolean"
+        },
+        "next_month_receipts_and_operating_payments": {
+          "title": "Next Month Receipts And Operating Payments",
+          "type": "boolean"
+        },
+        "balance_after_all_debt": {
+          "title": "Balance After All Debt",
+          "type": "boolean"
+        },
+        "dscr": {
+          "title": "Dscr",
+          "type": "boolean"
+        },
+        "debt_to_ebitda": {
+          "title": "Debt To Ebitda",
+          "type": "boolean"
+        },
+        "collateral_valuation": {
+          "title": "Collateral Valuation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "annual_model",
+        "monthly_cash_flow",
+        "next_month_receipts_and_operating_payments",
+        "balance_after_all_debt",
+        "dscr",
+        "debt_to_ebitda",
+        "collateral_valuation"
+      ],
+      "title": "Readiness",
+      "type": "object"
+    },
+    "Recommendation": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "Recommendation",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "filename": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filename"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "locator": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Locator",
+          "type": "string"
+        },
+        "quote": {
+          "default": "",
+          "maxLength": 1500,
+          "title": "Quote",
+          "type": "string"
+        },
+        "is_mock": {
+          "default": false,
+          "title": "Is Mock",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "locator"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Statistic": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "enum": [
+            "RUB",
+            "ratio"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "formula": {
+          "title": "Formula",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "formula",
+        "status"
+      ],
+      "title": "Statistic",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2,
+      "default": 2,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "application": {
+      "$ref": "#/$defs/ApplicationSummary"
+    },
+    "annual_model_input": {
+      "$ref": "#/$defs/AnnualInput"
+    },
+    "cash_flow": {
+      "$ref": "#/$defs/CashFlowOutput"
+    },
+    "statistics": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Statistic"
+      },
+      "title": "Statistics",
+      "type": "object"
+    },
+    "next_month_forecast": {
+      "$ref": "#/$defs/ForecastOutput"
+    },
+    "model_outputs": {
+      "$ref": "#/$defs/ModelOutputs"
+    },
+    "document_fields": {
+      "items": {
+        "$ref": "#/$defs/DocumentField"
+      },
+      "title": "Document Fields",
+      "type": "array"
+    },
+    "client_requests": {
+      "items": {
+        "$ref": "#/$defs/ClientRequest"
+      },
+      "title": "Client Requests",
+      "type": "array"
+    },
+    "employee_recommendations": {
+      "items": {
+        "$ref": "#/$defs/Recommendation"
+      },
+      "title": "Employee Recommendations",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/AnalysisWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "readiness": {
+      "$ref": "#/$defs/Readiness"
+    },
+    "is_mock": {
+      "title": "Is Mock",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "application",
+    "annual_model_input",
+    "cash_flow",
+    "statistics",
+    "next_month_forecast",
+    "model_outputs",
+    "document_fields",
+    "client_requests",
+    "employee_recommendations",
+    "warnings",
+    "readiness",
+    "is_mock"
+  ],
+  "title": "AnalystResult",
+  "type": "object"
+}

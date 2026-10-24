@@ -1,59 +1,38 @@
 {% extends "core/base.html" %}
+{% load static %}
 {% block title %}Заявка {{ application.id|stringformat:"s"|slice:":8"|upper }} · Банк{% endblock %}
+{% block js %}{% if financial.state == 'ready' %}
+  <script defer src="{% static 'core/vendor/chart.umd.min.js' %}"></script>
+  <script defer src="{% static 'core/js/charts.js' %}"></script>
+{% endif %}{% endblock %}
 {% block content %}
-<main class="content-main content-main--wide">
-  <a href="{% url 'bank-queue' %}" class="back-link">← К очереди</a>
+<main class="content-main content-main--wide employee-card">
+  <div class="card-topline">
+    <a href="{% url 'bank-queue' %}{{ queue_query }}" class="back-link">← К очереди</a>
+    {% if queue_nav %}
+      <nav class="queue-nav" aria-label="Соседние заявки в очереди">
+        {% if queue_nav.previous %}<a href="{% url 'bank-application-detail' queue_nav.previous %}{{ queue_query }}" class="button button--secondary" rel="prev">← Предыдущая</a>{% else %}<span class="button button--secondary is-disabled" aria-disabled="true">← Предыдущая</span>{% endif %}
+        <span class="queue-nav__position">{{ queue_nav.position }} из {{ queue_nav.total }}</span>
+        {% if queue_nav.next %}<a href="{% url 'bank-application-detail' queue_nav.next %}{{ queue_query }}" class="button button--secondary" rel="next">Следующая →</a>{% else %}<span class="button button--secondary is-disabled" aria-disabled="true">Следующая →</span>{% endif %}
+      </nav>
+    {% endif %}
+  </div>
   <header class="page-header page-header--detail"><div><p class="breadcrumb">Заявки / №{{ application.id|stringformat:"s"|slice:":8"|upper }}</p><div class="title-line"><h1>Заявка №{{ application.id|stringformat:"s"|slice:":8"|upper }}</h1><span class="status {% if application.status == 'APPROVED' %}status--positive{% elif application.status == 'DECLINED' %}status--negative{% elif application.status == 'NEEDS_REVISION' or application.status == 'PENDING_APPROVAL' %}status--warning{% else %}status--progress{% endif %}">{{ application.get_status_display }}</span></div><p>{{ application.organization_name }} · ИНН {{ application.inn }}</p></div><p class="version-note">Версия №{{ version.version_number }}<br>Ответственный: {{ application.assigned_to.get_full_name|default:"Не назначен" }}</p></header>
+
+  {% include "applications/bank/_kpis.html" %}
+  <p class="ai-notice">Блоки анализа — автоматические расчёты по документам клиента: они помогают сотруднику, но не являются решением банка.</p>
+  {% include "applications/bank/_recalculation.html" %}
 
   <div class="detail-grid">
     <div class="stack">
-{% include "applications/_saved_advice.html" %}
-{% include "applications/_document_analysis.html" %}
-{% include "applications/_node_processing.html" %}
-      <section class="panel"><div class="panel__header"><h2>Заявка клиента</h2></div><div class="panel__body"><dl class="summary-grid"><div><dt>Продукт</dt><dd>{{ version.product.name }}</dd></div><div><dt>Сумма</dt><dd>{{ version.amount|floatformat:"0g" }} ₽</dd></div><div><dt>Срок</dt><dd>{{ version.term_months }} мес.</dd></div></dl><div class="purpose-block"><span>Цель кредита</span><p>{{ version.purpose }}</p></div></div></section>
-
-      <section class="panel"><div class="panel__header"><h2>Документы и обработка</h2>{% if processing_job %}<span class="status status--progress">{{ processing_job.get_status_display }}</span>{% endif %}</div><div class="panel__body"><ul>{% for document in documents %}<li>{{ document.original_name }} · {{ document.size|filesizeformat }}</li>{% empty %}<li class="muted-copy">Документов нет.</li>{% endfor %}</ul>{% if processing_job.last_error %}<p class="form-error">{{ processing_job.last_error }}</p>{% endif %}{% if processing_job.status == 'COMPLETED' %}<p class="muted-copy">Получены структурированные результаты: {{ processing_job.serialized_documents.count }}.</p>{% endif %}</div></section>
-{% include "applications/_node_review.html" %}
-{% include "applications/_document_feedback.html" %}
-
-      <section class="panel" aria-labelledby="analysis-title">
-        <div class="panel__header">
-          <div><h2 id="analysis-title">Аналитика заявки</h2><p>Справочный результат демо-сценария, не решение банка.</p></div>
-          {% if analysis_view.status_label %}<span class="status {{ analysis_view.status_class }}">{{ analysis_view.status_label }}</span>{% endif %}
-        </div>
-        <div class="panel__body">
-          {% if analysis_view.state == 'result' %}
-            {% if analysis_view.is_demo %}<div class="review-note"><strong>ДЕМО.</strong> Демонстрационные данные: реальные ML-модели и OCR не подключены, результат сформирован демо-сценарием.</div>{% endif %}
-            <dl class="summary-grid">
-              <div><dt>Рекомендация</dt><dd>{{ analysis_view.recommendation_label }}</dd></div>
-              <div><dt>Сценарий</dt><dd>{{ analysis_view.scenario_label }}</dd></div>
-              <div><dt>Завершено</dt><dd>{% if analysis_view.completed_at %}{{ analysis_view.completed_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</dd></div>
-            </dl>
-            <p class="muted-copy">Версия заявки №{{ analysis_view.version_number }} · Модель {{ analysis_view.model_version }} · Политика {{ analysis_view.policy_version }}</p>
-            <div class="purpose-block"><span>Резюме</span><p>{{ analysis_view.summary }}</p></div>
-            {% if analysis_view.reason_codes %}<p class="muted-copy">Коды оснований: {% for code in analysis_view.reason_codes %}<code>{{ code }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-            <ul class="timeline">
-              {% for component in analysis_view.components %}
-                <li>
-                  <div class="timeline__head"><strong>{{ component.title }}</strong><span class="status {{ component.status_class }}">{{ component.status_label }}</span></div>
-                  {% if component.summary %}<p>{{ component.summary }}</p>{% else %}<p>Описание компонента отсутствует.</p>{% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-            <p class="muted-copy">Рекомендация носит справочный характер и не заменяет решение банка.</p>
-          {% elif analysis_view.state == 'running' %}
-            <p class="muted-copy">{{ analysis_view.message }}</p>
-          {% elif analysis_view.state == 'failed' %}
-            <div class="review-note">Аналитика завершилась с ошибкой. Автоматический результат недоступен; подробности не отображаются.</div>
-            <p class="muted-copy">Продолжайте ручное рассмотрение или обновите страницу позже.</p>
-          {% elif analysis_view.state == 'unavailable' %}
-            <p class="muted-copy">Результат аналитики пока недоступен.</p>
-          {% else %}
-            <p class="muted-copy">Для этой версии заявки аналитика недоступна. Возможно, заявка создана до подключения аналитики или запуск ещё не создан.</p>
-          {% endif %}
-          <p class="muted-copy">Ручные действия по заявке доступны независимо от результата аналитики.</p>
-        </div>
-      </section>
+      <div class="compare-grid">
+        {% include "applications/bank/_client_side.html" %}
+        {% include "applications/bank/_analysis_side.html" %}
+      </div>
+      {% include "applications/bank/_finance_charts.html" %}
+      {% include "applications/bank/_remarks.html" %}
+      {% include "applications/bank/_model_inputs.html" %}
+      {% include "applications/bank/_node_inputs.html" %}
 
       <section class="panel"><div class="panel__header"><h2>Комментарии</h2></div><div class="panel__body">
         <div class="comment-list">{% for comment in application.comments.all %}<article class="comment {% if comment.audience == 'INTERNAL' %}comment--internal{% else %}comment--client{% endif %}"><div class="comment__meta"><strong>{{ comment.author.get_full_name|default:comment.author.email }}</strong><span>{{ comment.get_audience_display }}</span></div><p>{{ comment.text }}</p><small>{{ comment.created_at|date:"d.m.Y H:i" }}</small></article>{% empty %}<p class="muted-copy">Комментариев пока нет.</p>{% endfor %}</div>
@@ -61,6 +40,55 @@
       </div></section>
 
       <section class="panel"><div class="panel__header"><h2>История обработки</h2></div><div class="panel__body"><ol class="timeline">{% for event in application.events.all reversed %}<li><div class="timeline__head"><strong>{{ event.get_event_type_display }}</strong><time>{{ event.created_at|date:"d.m.Y H:i" }}</time></div>{% if event.message %}<p>{{ event.message }}</p>{% endif %}</li>{% empty %}<li>Событий пока нет.</li>{% endfor %}</ol></div></section>
+
+      <details class="tech-details">
+        <summary>Технические детали: подбор, исходные ответы узла и демо-аналитика</summary>
+        <div class="stack">
+{% include "applications/_saved_advice.html" %}
+{% include "applications/_document_analysis.html" %}
+{% include "applications/_node_processing.html" %}
+{% include "applications/_node_review.html" %}
+{% include "applications/_document_feedback.html" %}
+          <section class="panel" aria-labelledby="analysis-title">
+            <div class="panel__header">
+              <div><h2 id="analysis-title">Аналитика заявки</h2><p>Справочный результат демо-сценария, не решение банка.</p></div>
+              {% if analysis_view.status_label %}<span class="status {{ analysis_view.status_class }}">{{ analysis_view.status_label }}</span>{% endif %}
+            </div>
+            <div class="panel__body">
+              {% if analysis_view.state == 'result' %}
+                {% if analysis_view.is_demo %}<div class="review-note"><strong>ДЕМО.</strong> Демонстрационные данные: реальные ML-модели и OCR не подключены, результат сформирован демо-сценарием.</div>{% endif %}
+                <dl class="summary-grid">
+                  <div><dt>Рекомендация</dt><dd>{{ analysis_view.recommendation_label }}</dd></div>
+                  <div><dt>Сценарий</dt><dd>{{ analysis_view.scenario_label }}</dd></div>
+                  <div><dt>Завершено</dt><dd>{% if analysis_view.completed_at %}{{ analysis_view.completed_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</dd></div>
+                </dl>
+                <p class="muted-copy">Версия заявки №{{ analysis_view.version_number }} · Модель {{ analysis_view.model_version }} · Политика {{ analysis_view.policy_version }}</p>
+                <div class="purpose-block"><span>Резюме</span><p>{{ analysis_view.summary }}</p></div>
+                {% if analysis_view.reason_codes %}<p class="muted-copy">Коды оснований: {% for code in analysis_view.reason_codes %}<code>{{ code }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+                <ul class="timeline">
+                  {% for component in analysis_view.components %}
+                    <li>
+                      <div class="timeline__head"><strong>{{ component.title }}</strong><span class="status {{ component.status_class }}">{{ component.status_label }}</span></div>
+                      {% if component.summary %}<p>{{ component.summary }}</p>{% else %}<p>Описание компонента отсутствует.</p>{% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+                <p class="muted-copy">Рекомендация носит справочный характер и не заменяет решение банка.</p>
+              {% elif analysis_view.state == 'running' %}
+                <p class="muted-copy">{{ analysis_view.message }}</p>
+              {% elif analysis_view.state == 'failed' %}
+                <div class="review-note">Аналитика завершилась с ошибкой. Автоматический результат недоступен; подробности не отображаются.</div>
+                <p class="muted-copy">Продолжайте ручное рассмотрение или обновите страницу позже.</p>
+              {% elif analysis_view.state == 'unavailable' %}
+                <p class="muted-copy">Результат аналитики пока недоступен.</p>
+              {% else %}
+                <p class="muted-copy">Для этой версии заявки аналитика недоступна. Возможно, заявка создана до подключения аналитики или запуск ещё не создан.</p>
+              {% endif %}
+              <p class="muted-copy">Ручные действия по заявке доступны независимо от результата аналитики.</p>
+            </div>
+          </section>
+        </div>
+      </details>
     </div>
 
     <aside><section class="panel panel--decision decision-panel"><div class="panel__header"><h2>Следующий шаг</h2></div><div class="panel__body"><p class="muted-copy">Доступные действия зависят от статуса заявки и вашей роли.</p>{% if action_form.non_field_errors or action_form.note.errors %}<div class="error-box">{{ action_form.non_field_errors }}{{ action_form.note.errors }}</div>{% endif %}<form method="post" class="form-stack" novalidate>{% csrf_token %}<input type="hidden" name="form_type" value="action"><label class="form-field">Комментарий к действию{{ action_form.note }}</label><div class="decision-actions">{% if application.status == 'SUBMITTED' and can_process_applications %}<button name="action" value="take" class="button button--decision button--wide">Взять в работу</button>{% elif application.status == 'IN_REVIEW' and can_process_applications %}<button name="action" value="send_to_approval" class="button button--decision button--wide">Передать на согласование</button><button name="action" value="request_revision" class="button button--secondary button--wide">Вернуть на доработку</button>{% elif application.status == 'PENDING_APPROVAL' and can_approve_applications %}<button name="action" value="approve" class="button button--decision button--wide">Одобрить</button><button name="action" value="decline" class="button button--danger button--wide">Отклонить</button><button name="action" value="return_to_review" class="button button--secondary button--wide">Вернуть специалисту</button>{% else %}<p class="decision-empty">Сейчас действий по смене статуса нет.</p>{% endif %}</div></form></div></section></aside>

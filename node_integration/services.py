@@ -37,19 +37,61 @@ class NodeFeedbackConflict(Exception):
     """feedback_id переиспользован с другим содержимым."""
 
 
+class NodeJobBusy(Exception):
+    """Узел ещё обрабатывает прошлую попытку этой версии: второй запрос создал бы дубль."""
+
+
 def enqueue_version(version):
-    """Создать ровно одну PENDING-задачу узла для версии заявки.
+    """Создать первую PENDING-задачу узла для версии заявки, если её ещё нет.
 
     Вызывается в транзакции сохранения документов; внешних запросов не делает.
     """
-    job, _ = NodeJob.objects.get_or_create(
-        version=version,
-        defaults={
-            "status": NodeJob.Status.PENDING,
-            "available_at": timezone.now(),
-        },
-    )
+    job = NodeJob.objects.filter(version=version).order_by("created_at").first()
+    if job is None:
+        job = NodeJob.objects.create(
+            version=version,
+            status=NodeJob.Status.PENDING,
+            available_at=timezone.now(),
+        )
     return job
+
+
+def latest_job(version):
+    """Последняя попытка узла по версии (любого статуса) или ``None``."""
+    return NodeJob.objects.filter(version=version).order_by("-created_at").first()
+
+
+def latest_completed_job(version):
+    """Последняя попытка с доставленным результатом: её показываем, пока новая в работе."""
+    return (
+        NodeJob.objects.filter(version=version, status=NodeJob.Status.COMPLETED)
+        .order_by("-created_at")
+        .first()
+    )
+
+
+@transaction.atomic
+def request_recalculation(version, *, user):
+    """Поставить версию на повторную отправку узлу с актуальными данными для расчёта.
+
+    POST /jobs у узла не идемпотентен, поэтому новая попытка создаётся, только когда
+    прошлая уже не в работе. Ещё не отправленная PENDING-попытка заберёт свежие
+    данные сама: контекст собирается в момент отправки, — тогда новой не нужно.
+    Возвращает (задача, создана ли новая).
+    """
+    jobs = NodeJob.objects.select_for_update().filter(version=version).order_by("-created_at")
+    current = jobs.first()
+    if current is not None and current.status == NodeJob.Status.PENDING:
+        return current, False
+    if current is not None and current.status in NodeJob.ACTIVE_STATUSES:
+        raise NodeJobBusy("Узел ещё обрабатывает прошлую попытку; пересчёт можно запустить после его ответа")
+    job = NodeJob.objects.create(
+        version=version,
+        status=NodeJob.Status.PENDING,
+        available_at=timezone.now(),
+        requested_by=user,
+    )
+    return job, True
 
 
 def canonical_json(value):

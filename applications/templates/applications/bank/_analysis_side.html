@@ -1,0 +1,88 @@
+<section class="panel side-panel side-panel--ai" aria-labelledby="analysis-side-title">
+  <div class="panel__header">
+    <div><p class="side-panel__eyebrow">Анализ</p><h2 id="analysis-side-title">Что выдал анализ</h2></div>
+    {% if financial.is_mock %}<span class="status status--warning">Демо-данные</span>{% endif %}
+  </div>
+  <div class="panel__body">
+    {% if financial.state == 'ready' %}
+      {% if financial.highlights %}
+        <h3 class="side-heading side-heading--first">Ключевые выводы</h3>
+        <ul class="signal-list">
+          {% for item in financial.highlights %}
+            <li class="signal signal--{{ item.tone }}"><span class="signal__icon" aria-hidden="true"></span><p>{{ item.message }}</p></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      <h3 class="side-heading">Проблемные сигналы <span class="side-heading__count">{{ financial.warnings|length }}</span></h3>
+      {% if financial.warnings %}
+        <ul class="signal-list">
+          {% for warning in financial.warnings %}
+            <li class="signal signal--{{ warning.tone }}">
+              <span class="signal__dot" aria-hidden="true"></span>
+              <p>{{ warning.message }}</p>
+              {% if warning.severity_label %}<span class="status status--{{ warning.tone }}">{{ warning.severity_label }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted-copy">Узел не нашёл сигналов, требующих внимания.</p>
+      {% endif %}
+
+      <h3 class="side-heading">Коэффициенты</h3>
+      <div class="metric-grid">
+        {% for statistic in financial.statistics %}
+          <div class="metric{% if not statistic.available %} metric--empty{% endif %}"{% if statistic.reason %} title="{{ statistic.reason }}"{% endif %}>
+            <span class="metric__label">{{ statistic.label }}</span>
+            <strong class="metric__value">{{ statistic.display }}</strong>
+            <small class="metric__formula">{{ statistic.formula }}</small>
+          </div>
+        {% empty %}
+          <p class="muted-copy">Коэффициенты не рассчитаны.</p>
+        {% endfor %}
+      </div>
+
+      {% if financial.forecast.ready %}
+        <h3 class="side-heading">Сценарии на {{ financial.forecast.period }}</h3>
+        <table class="mini-table">
+          <thead><tr><th>Сценарий</th><th class="num">Остаток после всех платежей</th><th class="num">Разрыв</th></tr></thead>
+          <tbody>
+            {% for scenario in financial.forecast.scenarios %}
+              <tr>
+                <th scope="row">{{ scenario.label }}<small class="source-line">{{ scenario.assumptions }}</small></th>
+                <td class="num">{{ scenario.balance_after_all_debt }}</td>
+                <td class="num">{% if scenario.has_gap %}<span class="status status--negative">{{ scenario.cash_gap_display }}</span>{% else %}нет{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+
+      <h3 class="side-heading">Вывод финмодели</h3>
+      {% if financial.model_outputs.run %}
+        <dl class="fact-list">
+          {% if financial.model_outputs.risk_grade %}<div><dt>Риск-грейд</dt><dd>{{ financial.model_outputs.risk_grade }}</dd></div>{% endif %}
+          {% for entry in financial.model_outputs.entries %}<div><dt>{{ entry.label }}</dt><dd>{{ entry.display }}</dd></div>{% endfor %}
+        </dl>
+        {% if financial.model_outputs.note %}<p class="muted-copy">{{ financial.model_outputs.note }}</p>{% endif %}
+      {% else %}
+        <p class="muted-copy">ML-модель ещё не запускалась. Риск-грейд, вероятности и безопасный лимит появятся после её расчёта по годовым показателям{% if not financial.readiness.items.0.ready %} — для этого сначала нужны все годовые входы{% endif %}.</p>
+      {% endif %}
+
+      {% if financial.employee_recommendations %}
+        <h3 class="side-heading">Что проверить сотруднику</h3>
+        <ul class="check-list">{% for message in financial.employee_recommendations %}<li>{{ message }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if can_confirm_inputs %}<a href="#node-inputs" class="recommendation-link">{% if financial_inputs %}Изменить данные для расчёта →{% else %}Подтвердить счета, выписки и платёж →{% endif %}</a>{% endif %}
+    {% elif financial.state == 'processing_error' %}
+      <div class="review-note">Узел сообщил о технической ошибке обработки. Это не замечание к документам клиента; финансовый анализ недоступен.</div>
+    {% elif financial.state == 'unsupported' %}
+      <p class="muted-copy">Ответ узла в старом формате без финансового анализа. Исходный ответ — в технических деталях внизу.</p>
+    {% else %}
+      <div class="empty-state empty-state--compact">
+        <h2>Анализа пока нет</h2>
+        <p>Сейчас: {% include "applications/bank/_node_state.html" %}. Страница не обновляется сама — откройте её позже.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>

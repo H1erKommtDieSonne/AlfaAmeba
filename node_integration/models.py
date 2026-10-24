@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -9,7 +10,14 @@ class NodeJob(models.Model):
 
     Запись создаётся вместе с документами версии в статусе PENDING. Отправку
     выполняет отдельный воркер; обратный вызов узла только фиксирует результат.
+
+    Попыток на версию может быть несколько: пересчёт после того, как сотрудник
+    подтвердил данные для расчёта, — новая задача с новым job_id узла, а прежняя
+    остаётся в истории со своим результатом (docs/financial-api-v2.md, «Статусы,
+    callback, версии»). Карточка показывает последнюю попытку.
     """
+
+    ACTIVE_STATUSES = ("PENDING", "SENDING", "WAITING")
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Ожидает отправки"
@@ -20,10 +28,18 @@ class NodeJob(models.Model):
         UNCERTAIN = "UNCERTAIN", "Неизвестный результат"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    version = models.OneToOneField(
+    version = models.ForeignKey(
         "applications.ApplicationVersion",
-        related_name="node_job",
+        related_name="node_jobs",
         on_delete=models.PROTECT,
+    )
+    # Кто запросил пересчёт; у первой попытки, созданной вместе с версией, пусто.
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="requested_node_jobs",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True
@@ -70,3 +86,47 @@ class NodeFeedback(models.Model):
 
     def __str__(self):
         return f"Замечания {self.feedback_id} — {self.job}"
+
+
+class FinancialInputs(models.Model):
+    """Данные для расчёта узла, которые подтверждает сотрудник банка, а не LLM.
+
+    Без них узел не утверждает, что видит весь денежный поток, не признаёт месяцы
+    выписки полными и не учитывает платёж по новому кредиту (docs/financial-api-v2.md,
+    «Контекст заявки»). Привязаны к версии: другой комплект документов — другие периоды.
+    В контекст уходят при следующей отправке версии узлу.
+    """
+
+    class DebtStatus(models.TextChoices):
+        UNKNOWN = "UNKNOWN", "Не подтверждено"
+        NONE = "NONE", "Действующих долгов нет"
+        COMPLETE = "COMPLETE", "Графики всех долгов приложены"
+
+    version = models.OneToOneField(
+        "applications.ApplicationVersion",
+        related_name="financial_inputs",
+        on_delete=models.CASCADE,
+    )
+    annual_rate_percent = models.DecimalField("ставка, % годовых", max_digits=5, decimal_places=2, null=True, blank=True)
+    proposed_monthly_payment_rub = models.DecimalField(
+        "платёж по новому кредиту, ₽", max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    # Все расчётные счета клиента; без списка узел не считает поток полным.
+    expected_account_ids = models.JSONField("подтверждённые счета", default=list, blank=True)
+    # [{filename, account_id, period_start, period_end, opening_balance_rub, closing_balance_rub, complete}]
+    statement_periods = models.JSONField("периоды выписок", default=list, blank=True)
+    debt_status = models.CharField("долги", max_length=16, choices=DebtStatus.choices, default=DebtStatus.UNKNOWN)
+    debt_schedule_start = models.DateField("графики долгов с", null=True, blank=True)
+    debt_schedule_end = models.DateField("графики долгов по", null=True, blank=True)
+    reporting_year = models.PositiveSmallIntegerField("отчётный год", null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="confirmed_financial_inputs", on_delete=models.PROTECT
+    )
+    confirmed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "данные для расчёта узла"
+        verbose_name_plural = "данные для расчёта узла"
+
+    def __str__(self):
+        return f"Данные для расчёта — {self.version}"

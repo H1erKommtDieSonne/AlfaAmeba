@@ -17,6 +17,7 @@ import secrets
 import socket
 from dataclasses import dataclass
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
 from urllib.parse import quote, urlsplit
@@ -28,7 +29,7 @@ from django.utils import timezone
 
 from products.advisor import requirements
 
-from .models import NodeJob
+from .models import FinancialInputs, NodeJob
 
 MAX_DOCUMENTS = 5
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
@@ -36,7 +37,16 @@ MAX_PROMPT_CHARS = 20000
 MAX_RESPONSE_BYTES = 64 * 1024
 # Необязательный JSON-контекст заявки: узел принимает объект до 64 KiB.
 MAX_CONTEXT_BYTES = 64 * 1024
-CONTEXT_SCHEMA_VERSION = 1
+# 2 — прежние поля плюс поля финансового контракта v2 (docs/financial-api-v2.md).
+CONTEXT_SCHEMA_VERSION = 2
+# Продукт Django → loan_type контракта v2; неизвестный продукт тип не получает.
+LOAN_TYPES = {
+    "working-capital": "working_capital",
+    "contract-finance": "contract",
+    "investment": "investment",
+    "refinancing": "refinancing",
+}
+INN_PATTERN = re.compile(r"^(\d{10}|\d{12})$")
 CHECKLIST_SOURCE_SNAPSHOT = "snapshot"
 CHECKLIST_SOURCE_FALLBACK = "fallback"
 CHECKLIST_SOURCE_EMPTY = "empty"
@@ -276,12 +286,94 @@ def _fallback_checklist(product_code):
     return _sanitize_checklist(entries)
 
 
-def build_application_context(version):
+def _resolve_inn(snapshot, version=None):
+    """ИНН из снимка версии, а у старых снимков без него — с самой заявки."""
+    value = snapshot.get("inn")
+    if value is None and version is not None:
+        value = getattr(getattr(version, "application", None), "inn", None)
+    return value if isinstance(value, str) and INN_PATTERN.fullmatch(value) else None
+
+
+def _positive_number(value):
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    return float(number) if number.is_finite() and number > 0 else None
+
+
+def _resolve_amount(version, snapshot):
+    """Сумма — с самой версии (она неизменяема после отправки), иначе из снимка."""
+    value = getattr(version, "amount", None)
+    return _positive_number(snapshot.get("amount") if value is None else value)
+
+
+def _resolve_term(version, snapshot):
+    value = getattr(version, "term_months", None)
+    value = snapshot.get("term_months") if value is None else value
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _statement_period(raw):
+    """Период выписки из подтверждения сотрудника: только поля контракта с проверкой типов."""
+    if not isinstance(raw, dict):
+        return None
+    filename = _clean_text(raw.get("filename"), 255)
+    account_id = _clean_text(raw.get("account_id"), 64)
+    start = _clean_text(raw.get("period_start"), 10)
+    end = _clean_text(raw.get("period_end"), 10)
+    if not (filename and account_id and start and end):
+        return None
+    period = {"filename": filename, "account_id": account_id, "period_start": start, "period_end": end,
+              "complete": raw.get("complete") is True}
+    for key in ("opening_balance_rub", "closing_balance_rub"):
+        value = raw.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            period[key] = float(value)
+    return period
+
+
+def _inputs_context(inputs):
+    """Что подтвердил сотрудник (``FinancialInputs``) — ключами контракта v2.
+
+    Неподтверждённое не отправляется вовсе: «пустой список графиков не означает
+    отсутствие долга», и узел не должен получать догадки вместо подтверждений.
+    """
+    if inputs is None:
+        return {}
+    context = {}
+    if inputs.annual_rate_percent is not None:
+        context["annual_rate_percent"] = float(inputs.annual_rate_percent)
+    if inputs.proposed_monthly_payment_rub is not None:
+        context["proposed_monthly_payment_rub"] = float(inputs.proposed_monthly_payment_rub)
+    accounts = [item for item in (inputs.expected_account_ids or []) if _clean_text(item, 64)]
+    if accounts:
+        context["expected_account_ids"] = accounts
+    periods = [period for period in map(_statement_period, inputs.statement_periods or []) if period]
+    if periods:
+        context["statement_periods"] = periods
+    if inputs.debt_status == "NONE":
+        context["no_existing_debt_confirmed"] = True
+    elif inputs.debt_status == "COMPLETE" and inputs.debt_schedule_start and inputs.debt_schedule_end:
+        context["debt_schedule_complete"] = True
+        context["debt_schedule_start"] = inputs.debt_schedule_start.isoformat()
+        context["debt_schedule_end"] = inputs.debt_schedule_end.isoformat()
+    if inputs.reporting_year:
+        context["reporting_year"] = int(inputs.reporting_year)
+    return context
+
+
+def build_application_context(version, *, inputs=None, provider_reports=(), analysis_date=None):
     """Чистый неизменяемый контекст версии для поля ``application_context``.
 
     Ничего не додумывает: ``collateral`` — только строгий bool из снимка иначе
     ``None``; список требований берётся из снимка, а при его отсутствии — из
-    правил продукта. Персональные данные и сырой снимок не передаются.
+    правил продукта. Название, цель кредита и сырой снимок не передаются.
+
+    Поверх прежних полей — поля контракта v2 (docs/financial-api-v2.md): без ИНН
+    узел не отсечёт значения другого лица, без суммы и срока не посчитает платёж,
+    без подтверждений сотрудника не признает месяцы выписки полными. Неизвестное
+    не отправляется вовсе, а не нулём: так узел оставит поле пустым.
     """
     snapshot = _snapshot_mapping(version)
     product_code = _resolve_product_code(version, snapshot)
@@ -296,7 +388,7 @@ def build_application_context(version):
             CHECKLIST_SOURCE_FALLBACK if checklist else CHECKLIST_SOURCE_EMPTY
         )
 
-    return {
+    context = {
         "schema_version": CONTEXT_SCHEMA_VERSION,
         "application_id": str(version.application_id),
         "version_id": str(version.pk),
@@ -306,6 +398,74 @@ def build_application_context(version):
         "checklist": checklist,
         "checklist_source": checklist_source,
     }
+    loan_type = LOAN_TYPES.get(product_code)
+    v2 = {
+        "document_version": int(version.version_number),
+        "borrower_inn": _resolve_inn(snapshot, version),
+        "loan_type": loan_type,
+        "loan_amount_rub": _resolve_amount(version, snapshot),
+        "term_months": _resolve_term(version, snapshot),
+        "has_collateral": collateral is True,
+        "contract_appendices_required": loan_type == "contract",
+        "analysis_date": (analysis_date or timezone.localdate()).isoformat(),
+        **_inputs_context(inputs),
+    }
+    if provider_reports:
+        v2["provider_reports"] = list(provider_reports)
+    context.update({key: value for key, value in v2.items() if value is not None})
+    return context
+
+
+def _provider_endpoint(raw_url):
+    """База провайдера отчётности (mock-bo) → (host, port, tls, prefix) или ``None``."""
+    if not isinstance(raw_url, str) or not raw_url.strip():
+        return None
+    try:
+        parts = urlsplit(raw_url.strip())
+        port = parts.port
+    except ValueError:
+        return None
+    if (parts.scheme.lower() not in {"http", "https"} or not parts.hostname
+            or parts.username is not None or parts.password is not None or parts.query or parts.fragment):
+        return None
+    return parts.hostname, port, parts.scheme.lower() == "https", parts.path.rstrip("/")
+
+
+def fetch_provider_reports(version, inputs=None, *, today=None):
+    """Годовая отчётность ООО из провайдера для ``provider_reports``.
+
+    Узел сам по произвольным URL не ходит — отчётность приносит Django и передаёт
+    объект провайдера целиком. Провайдер выключен (пустой
+    ``DOCUMENT_NODE_PROVIDER_URL``), недоступен или ответил не тем — отправляем
+    без отчётности: это ухудшает анализ, но не повод не проверять документы.
+    """
+    endpoint = _provider_endpoint(getattr(settings, "DOCUMENT_NODE_PROVIDER_URL", ""))
+    inn = _resolve_inn(_snapshot_mapping(version), version)
+    # По ИНН из 10 цифр провайдер отдаёт отчётность юрлица; у ИП бухгалтерской отчётности нет.
+    if endpoint is None or inn is None or len(inn) != 10:
+        return []
+    host, port, use_tls, prefix = endpoint
+    year = inputs.reporting_year if inputs is not None and inputs.reporting_year else (today or timezone.localdate()).year - 1
+    path = f"{prefix}/api/v1/organizations/{inn}/metrics?year={int(year)}"
+    headers = {"Accept": "application/json", "User-Agent": "alfa-node-outbound/1", "Connection": "close"}
+    api_key = getattr(settings, "DOCUMENT_NODE_PROVIDER_API_KEY", "")
+    if isinstance(api_key, str) and api_key.strip():
+        headers["X-API-Key"] = api_key.strip()
+    timeout = getattr(settings, "DOCUMENT_NODE_TIMEOUT_SECONDS", 30)
+    connection_class = http.client.HTTPSConnection if use_tls else http.client.HTTPConnection
+    connection = connection_class(host, port, timeout=timeout if isinstance(timeout, int) and timeout > 0 else 30)
+    try:
+        connection.request("GET", path, headers=headers)
+        response = connection.getresponse()
+        body = response.read(MAX_RESPONSE_BYTES + 1)
+        if response.status != 200 or len(body) > MAX_RESPONSE_BYTES:
+            return []
+        report = json.loads(body.decode("utf-8"), parse_constant=_reject_constant)
+    except (OSError, http.client.HTTPException, ValueError, UnicodeDecodeError):
+        return []
+    finally:
+        connection.close()
+    return [report] if isinstance(report, dict) else []
 
 
 def serialize_application_context(context):
@@ -406,7 +566,14 @@ def prepare_request(job):
     if not 1 <= len(documents) <= MAX_DOCUMENTS:
         raise InvalidOutboundRequest("В версии должно быть от 1 до 5 документов")
     system_prompt = build_system_prompt(version)
-    application_context = serialize_application_context(build_application_context(version))
+    # Подтверждения сотрудника и отчётность берутся на момент отправки: попытка,
+    # поставленная до подтверждения, всё равно уйдёт со свежими данными.
+    inputs = FinancialInputs.objects.filter(version=version).first()
+    application_context = serialize_application_context(
+        build_application_context(
+            version, inputs=inputs, provider_reports=fetch_provider_reports(version, inputs)
+        )
+    )
     boundary = f"----DjangoNodeBoundary{secrets.token_hex(16)}"
     body = SpooledTemporaryFile(max_size=MULTIPART_SPOOL_BYTES, mode="w+b")
     try:

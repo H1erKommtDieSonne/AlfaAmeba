@@ -1,0 +1,13 @@
+<li class="remark remark--{{ remark.tone|default:'warning' }}">
+  <span class="remark__icon" aria-hidden="true"></span>
+  <div>
+    <strong>{{ remark.message }}</strong>
+    {% if remark.filename or remark.locator or remark.field %}<p class="remark__meta">{% spaceless %}
+      {% if remark.filename %}<span>{{ remark.filename }}</span>{% endif %}
+      {% if remark.locator %}<span>{{ remark.locator }}</span>{% endif %}
+      {% if remark.field %}<span>поле {{ remark.field }}</span>{% endif %}
+    {% endspaceless %}</p>{% endif %}
+    {% if remark.suggestion %}<p>{{ remark.suggestion }}</p>{% endif %}
+    {% if remark.quote %}<p class="remark__quote">«{{ remark.quote }}»</p>{% endif %}
+  </div>
+</li>

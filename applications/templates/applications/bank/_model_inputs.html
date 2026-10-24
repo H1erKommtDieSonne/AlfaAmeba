@@ -1,0 +1,57 @@
+{% if financial.state == 'ready' %}
+<section class="panel" aria-labelledby="inputs-title">
+  <div class="panel__header">
+    <div><h2 id="inputs-title">Что учла модель</h2><p>На каких данных построен анализ и чего для него не хватило</p></div>
+    {% if financial.analysis_date %}<span class="status status--neutral">расчёт на {{ financial.analysis_date }}</span>{% endif %}
+  </div>
+  <div class="panel__body">
+    <ul class="input-list">
+      <li class="{% if financial.files %}is-ok{% else %}is-missing{% endif %}">
+        <span class="input-list__icon" aria-hidden="true"></span>
+        <div>
+          <strong>Документы клиента</strong>
+          <small>{% for file in financial.files %}{{ file.filename }}{% if file.categories %} — {{ file.categories|join:", " }}{% endif %}{% if file.note %} ({{ file.note }}){% endif %}{% if not forloop.last %}; {% endif %}{% empty %}файлы не переданы{% endfor %}</small>
+        </div>
+        <span class="input-list__value">{{ financial.files|length }} файл.</span>
+      </li>
+      <li class="{% if financial.readiness.items.1.ready %}is-ok{% else %}is-missing{% endif %}">
+        <span class="input-list__icon" aria-hidden="true"></span>
+        <div>
+          <strong>Банковская выписка</strong>
+          <small>{% with first=financial.cash_flow.months|first last=financial.cash_flow.months|last %}{% if first %}{{ first.label }} — {{ last.label }} · {% endif %}{% endwith %}счета {% if financial.cash_flow.accounts_confirmed %}подтверждены{% else %}не подтверждены{% endif %}</small>
+        </div>
+        <span class="input-list__value">{{ financial.cash_flow.complete_months }} полн. мес.</span>
+      </li>
+      <li class="{% if financial.annual.ready %}is-ok{% else %}is-missing{% endif %}">
+        <span class="input-list__icon" aria-hidden="true"></span>
+        <div>
+          <strong>Годовая отчётность</strong>
+          <small>{% if financial.annual.ready %}все 10 входов годовой модели{% else %}не хватает: {{ financial.annual.missing|join:", "|default:"части показателей" }}{% endif %}</small>
+        </div>
+        <span class="input-list__value">{{ financial.annual.year|default:"—" }}</span>
+      </li>
+      <li class="{% if financial.processing.accepted_observations %}is-ok{% else %}is-missing{% endif %}">
+        <span class="input-list__icon" aria-hidden="true"></span>
+        <div>
+          <strong>Значения, извлечённые из документов</strong>
+          <small>каждое — с источником и цитатой из файла</small>
+        </div>
+        <span class="input-list__value">{{ financial.processing.accepted_observations|default_if_none:"—" }}</span>
+      </li>
+      <li class="{% if financial.forecast.ready %}is-ok{% else %}is-missing{% endif %}">
+        <span class="input-list__icon" aria-hidden="true"></span>
+        <div>
+          <strong>Прогноз остатка</strong>
+          <small>среднее трёх последних полных месяцев, сценарии ±10/20 %{% if financial.forecast.backtest.folds %} · бэктест: {{ financial.forecast.backtest.folds }} пров., ошибка {{ financial.forecast.backtest.mape }}{% endif %}</small>
+        </div>
+        <span class="input-list__value">{% if financial.forecast.ready %}построен{% else %}нет{% endif %}</span>
+      </li>
+    </ul>
+    <h3 class="side-heading">Готовность анализов</h3>
+    <ul class="readiness-list">
+      {% for item in financial.readiness.items %}<li class="{% if item.ready %}is-ok{% else %}is-missing{% endif %}">{{ item.label }}</li>{% endfor %}
+    </ul>
+    {% if financial.model %}<p class="muted-copy side-panel__note">Модель узла: {{ financial.model }}</p>{% endif %}
+  </div>
+</section>
+{% endif %}

@@ -274,3 +274,17 @@ document.addEventListener("alpine:init", () => {
     },
   }));
 });
+
+// Строка таблицы с data-href открывается кликом в любом месте, а не только по тексту ссылки.
+// Ссылки внутри строки остаются настоящими: Ctrl/⌘-клик, средняя кнопка и клавиатура
+// работают как обычно, а выделение текста мышью переход не запускает.
+document.addEventListener("click", (event) => {
+  const row = event.target.closest("tr[data-href]");
+  if (!row || event.target.closest("a, button, input, select, textarea, label")) return;
+  if (window.getSelection()?.toString()) return;
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) {
+    window.open(row.dataset.href, "_blank", "noopener");
+    return;
+  }
+  window.location.href = row.dataset.href;
+});

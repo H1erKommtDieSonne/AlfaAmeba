@@ -238,8 +238,12 @@ class OutboundSuccessTests(OutboundTestBase):
             "application_context",
         )
         context = json.loads(parts[1].get_payload(decode=True).decode("utf-8"))
-        self.assertEqual(context["schema_version"], 1)
+        self.assertEqual(context["schema_version"], 2)
         self.assertEqual(context["application_id"], str(job.version.application_id))
+        # Сумма и срок — с самой версии, тип — по продукту (контракт v2).
+        self.assertEqual(context["loan_amount_rub"], 1500000.0)
+        self.assertEqual(context["term_months"], 12)
+        self.assertEqual(context["loan_type"], "working_capital")
 
     def test_success_is_order_independent_when_created_at_ties(self):
         # Регрессия: одинаковый created_at у документов версии (типично для

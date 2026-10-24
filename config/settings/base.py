@@ -108,3 +108,7 @@ DOCUMENT_NODE_API_KEY = env("DOCUMENT_NODE_API_KEY", default="")
 DOCUMENT_NODE_CALLBACK_TOKEN = env("DOCUMENT_NODE_CALLBACK_TOKEN", default="")
 DOCUMENT_NODE_TIMEOUT_SECONDS = env.int("DOCUMENT_NODE_TIMEOUT_SECONDS", default=30)
 DOCUMENT_NODE_POLL_SECONDS = env.int("DOCUMENT_NODE_POLL_SECONDS", default=5)
+# Провайдер годовой отчётности (mock-bo): Django берёт отчёт ООО и кладёт его в
+# application_context.provider_reports. Пусто — отправляем без отчётности.
+DOCUMENT_NODE_PROVIDER_URL = env("DOCUMENT_NODE_PROVIDER_URL", default="")
+DOCUMENT_NODE_PROVIDER_API_KEY = env("DOCUMENT_NODE_PROVIDER_API_KEY", default="")

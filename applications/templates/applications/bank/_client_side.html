@@ -1,0 +1,50 @@
+<section class="panel side-panel" aria-labelledby="client-side-title">
+  <div class="panel__header">
+    <div><p class="side-panel__eyebrow">Клиент</p><h2 id="client-side-title">Что предоставил клиент</h2></div>
+  </div>
+  <div class="panel__body">
+    <dl class="fact-list">
+      <div><dt>Задача</dt><dd>{{ client_needs.need|default:"не указана" }}</dd></div>
+      <div><dt>Продукт</dt><dd>{{ version.product.name }}</dd></div>
+      <div><dt>Сумма и срок</dt><dd>{{ version.amount|floatformat:"0g" }}&nbsp;₽ · {{ version.term_months }} мес.</dd></div>
+      <div><dt>Залог</dt><dd>{% if client_needs.collateral %}предлагает{% else %}не предлагает{% endif %}</dd></div>
+    </dl>
+    <div class="purpose-block"><span>Цель кредита</span><p>{{ version.purpose }}</p></div>
+
+    <h3 class="side-heading">Документы <span class="side-heading__count">{{ documents|length }}</span></h3>
+    <ul class="doc-list">
+      {% for document in documents %}
+        <li><a href="{% url 'document-download' document.id %}">{{ document.original_name }}</a><small>{{ document.size|filesizeformat }}</small></li>
+      {% empty %}
+        <li class="muted-copy">Документов нет.</li>
+      {% endfor %}
+    </ul>
+
+    {% if financial.state == 'ready' %}
+      <h3 class="side-heading">Годовая отчётность{% if financial.annual.year %} за {{ financial.annual.year }} г.{% endif %}</h3>
+      <table class="mini-table">
+        <tbody>
+          {% for row in financial.annual.rows %}
+            <tr{% if row.missing %} class="is-missing"{% endif %}>
+              <th scope="row">{{ row.label }}{% for source in row.sources|slice:":1" %}{% include "applications/bank/_source.html" %}{% endfor %}</th>
+              <td class="num">{% if row.missing %}не получено{% else %}{{ row.display }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if financial.annual.missing %}<p class="form-error">Для годовой модели не хватает: {{ financial.annual.missing|join:", " }}.</p>{% endif %}
+
+      {% if financial.document_fields %}
+        <h3 class="side-heading">Извлечено из документов</h3>
+        <table class="mini-table">
+          <tbody>
+            {% for field in financial.document_fields %}
+              <tr><th scope="row">{{ field.name }}{% include "applications/bank/_source.html" with source=field.source %}</th><td class="num">{{ field.display }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      <p class="muted-copy side-panel__note">Источник под каждой строкой; при наведении — цитата из документа. Автоматическое извлечение не подтверждает подлинность.</p>
+    {% endif %}
+  </div>
+</section>

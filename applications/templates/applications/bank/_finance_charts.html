@@ -1,0 +1,67 @@
+{% if financial.state == 'ready' %}
+{{ financial.chart_data|json_script:"financial-chart-data" }}
+<section class="panel" aria-labelledby="cashflow-title">
+  <div class="panel__header">
+    <div>
+      <h2 id="cashflow-title">Денежный поток по выписке</h2>
+      <p>{% if financial.cash_flow.months %}Полных месяцев: {{ financial.cash_flow.complete_months }} · счета {% if financial.cash_flow.accounts_confirmed %}подтверждены банком{% else %}не подтверждены — поток может быть неполным{% endif %}{% else %}Месячных итогов нет{% endif %}</p>
+    </div>
+    {% if financial.cash_flow.months %}<span class="status status--neutral">ср. остаток {{ financial.cash_flow.average_balance }}</span>{% endif %}
+  </div>
+  <div class="panel__body">
+    {% if financial.chart_data.cashflow %}
+      <div class="chart-box chart-box--tall"><canvas data-chart="cashflow" data-source="financial-chart-data" role="img" aria-label="Поступления, платежи и остаток по месяцам"></canvas></div>
+      <details class="chart-table">
+        <summary>Таблица по месяцам</summary>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Месяц</th><th class="num">Поступления от покупателей</th><th class="num">Операционные платежи</th><th class="num">Долг</th><th class="num">Все поступления</th><th class="num">Все списания</th><th class="num">Остаток</th></tr></thead>
+            <tbody>
+              {% for month in financial.cash_flow.months %}
+                <tr><td>{{ month.label }}{% if not month.complete %} <span class="status status--warning">неполный</span>{% endif %}</td><td class="num">{{ month.receipts_display }}</td><td class="num">{{ month.operating_display }}</td><td class="num">{{ month.debt_display }}</td><td class="num">{{ month.inflows_display }}</td><td class="num">{{ month.outflows_display }}</td><td class="num">{{ month.closing_display }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted-copy">«Все поступления/списания» включают переводы между своими счетами и полученные займы — это не выручка и не операционные расходы.</p>
+      </details>
+    {% else %}
+      <p class="muted-copy">Узел не получил месячных итогов выписки: график строится после загрузки выписки.</p>
+    {% endif %}
+  </div>
+</section>
+
+<div class="split-grid">
+  <section class="panel" aria-labelledby="forecast-title">
+    <div class="panel__header">
+      <div>
+        <h2 id="forecast-title">Прогноз остатка{% if financial.forecast.period %} на {{ financial.forecast.period }}{% endif %}</h2>
+        <p>{% if financial.forecast.ready %}От факта на {{ financial.forecast.data_as_of }} · платёж по новому кредиту — в целевом месяце{% else %}Прогноз не построен{% endif %}</p>
+      </div>
+    </div>
+    <div class="panel__body">
+      {% if financial.chart_data.forecast %}
+        <div class="chart-box"><canvas data-chart="forecast" data-source="financial-chart-data" role="img" aria-label="Остаток по сценариям прогноза"></canvas></div>
+        {% if financial.forecast.limitations %}
+          <details class="chart-table"><summary>Допущения прогноза</summary><ul class="check-list">{% for item in financial.forecast.limitations %}<li>{{ item }}</li>{% endfor %}</ul></details>
+        {% endif %}
+      {% else %}
+        <p class="muted-copy">Нужны минимум три последовательных полных месяца выписки по всем подтверждённым счетам и согласованные остатки.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="concentration-title">
+    <div class="panel__header">
+      <div><h2 id="concentration-title">Поступления по покупателям</h2><p>За весь период выписки</p></div>
+    </div>
+    <div class="panel__body">
+      {% if financial.chart_data.concentration %}
+        <div class="chart-box"><canvas data-chart="concentration" data-source="financial-chart-data" role="img" aria-label="Доли покупателей в поступлениях"></canvas></div>
+      {% else %}
+        <p class="muted-copy">Покупатели в выписке не размечены — концентрацию посчитать нельзя.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endif %}

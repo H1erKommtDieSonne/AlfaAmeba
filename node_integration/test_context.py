@@ -18,7 +18,7 @@ from .outbound import (
 )
 from .test_outbound import OutboundTestBase
 
-CONTEXT_KEYS = {
+LEGACY_KEYS = {
     "schema_version",
     "application_id",
     "version_id",
@@ -28,6 +28,10 @@ CONTEXT_KEYS = {
     "checklist",
     "checklist_source",
 }
+# Поля контракта v2, которые есть всегда; остальные — только когда известны.
+V2_ALWAYS_KEYS = {"document_version", "has_collateral", "contract_appendices_required", "analysis_date"}
+# Заглушка без суммы, срока и ИНН, но с известным продуктом working-capital.
+CONTEXT_KEYS = LEGACY_KEYS | V2_ALWAYS_KEYS | {"loan_type"}
 
 
 def _stub(**overrides):
@@ -63,8 +67,13 @@ class ApplicationContextBuildTests(SimpleTestCase):
             }
         )
         context = build_application_context(version)
-        self.assertEqual(set(context), CONTEXT_KEYS)
-        self.assertEqual(context["schema_version"], 1)
+        self.assertEqual(set(context), LEGACY_KEYS | V2_ALWAYS_KEYS | {"loan_type", "borrower_inn"})
+        self.assertEqual(context["schema_version"], 2)
+        # Контракт v2: ИНН нужен узлу, чтобы отсечь значения другого лица.
+        self.assertEqual(context["borrower_inn"], "7707083893")
+        self.assertEqual(context["loan_type"], "contract")
+        self.assertIs(context["contract_appendices_required"], True)
+        self.assertIs(context["has_collateral"], True)
         self.assertEqual(context["application_id"], str(version.application_id))
         self.assertEqual(context["version_id"], str(version.pk))
         self.assertEqual(context["version_number"], 3)
@@ -82,7 +91,7 @@ class ApplicationContextBuildTests(SimpleTestCase):
             ],
         )
         serialized = json.dumps(context, ensure_ascii=False)
-        for forbidden in ("ООО Секрет", "7707083893", "не передаём", "uploaded", "drop-me"):
+        for forbidden in ("ООО Секрет", "не передаём", "uploaded", "drop-me"):
             self.assertNotIn(forbidden, serialized)
 
     def test_collateral_unknown_is_explicit_null_not_false(self):

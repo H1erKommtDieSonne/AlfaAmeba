@@ -117,10 +117,12 @@ Sender отправляет `POST <DOCUMENT_NODE_URL>/jobs` с `multipart/form-d
 
 `application_context` — строка с JSON-объектом (UTF-8, не больше 64 KiB).
 Отправлять его не обязательно: старые запросы без поля продолжают работать.
-Sender собирает контекст из неизменяемого снимка версии и не передаёт
-персональные данные (ни организацию, ни ИНН, ни назначение):
+Sender собирает контекст из неизменяемого снимка версии в момент отправки.
+Название организации и цель кредита не передаются; ИНН передаётся с версии 2
+контекста — без него узел не отсечёт значения другого лица
+([financial-api-v2.md](financial-api-v2.md)). Прежние поля:
 
-- `schema_version` — `1`;
+- `schema_version` — `2`;
 - `application_id`, `version_id`, `version_number` — идентификаторы версии;
 - `product_code` — код продукта из снимка, если он корректен, иначе код FK
   версии; метки текущего каталога не используются;
@@ -131,6 +133,28 @@ Sender собирает контекст из неизменяемого сни�
   загрузки; если снимка нет, список берётся из правил продукта, и только когда
   код продукта известен;
 - `checklist_source` — источник списка: `snapshot`, `fallback` или `empty`.
+
+Поля финансового контракта v2. Неизвестное не отправляется вовсе, а не нулём:
+
+- всегда: `document_version` (= `version_number`), `has_collateral` (`true`
+  только при строгом `collateral: true`), `contract_appendices_required`
+  (`true` для контрактного кредита), `analysis_date` (дата отправки);
+- когда известны: `borrower_inn` (ИНН из снимка), `loan_type`
+  (`working-capital` → `working_capital`, `contract-finance` → `contract`,
+  `investment`, `refinancing`), `loan_amount_rub` и `term_months` с самой версии;
+- подтверждённое сотрудником в карточке («Данные для расчёта», модель
+  `FinancialInputs`): `annual_rate_percent`, `proposed_monthly_payment_rub`,
+  `expected_account_ids`, `statement_periods`, `no_existing_debt_confirmed`
+  либо `debt_schedule_complete` с `debt_schedule_start/end`, `reporting_year`;
+- `provider_reports` — объект годовой отчётности ООО целиком, если задан
+  `DOCUMENT_NODE_PROVIDER_URL` (mock-bo, `GET
+  /api/v1/organizations/{ИНН}/metrics?year=…`). Недоступный провайдер не
+  мешает отправке: задача уходит без отчётности.
+
+Пересчёт после подтверждения данных — новая задача `NodeJob` той же версии
+(новый `job_id` узла); прежняя остаётся с результатом и замечаниями в истории.
+Новая попытка создаётся, только когда прошлая не `PENDING`/`SENDING`/`WAITING`:
+ещё не отправленная попытка сама заберёт свежие данные.
 
 Если контекст не сериализуется в строгий UTF-8 JSON (без `NaN` и surrogate)
 или превышает 64 KiB, задача помечается `FAILED` локально, без сетевого

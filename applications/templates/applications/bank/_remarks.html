@@ -1,0 +1,55 @@
+<div class="split-grid">
+  <section class="panel" aria-labelledby="remarks-title">
+    <div class="panel__header">
+      <div><h2 id="remarks-title">Замечания к документам</h2><p>Что автоматическая проверка нашла в присланных файлах</p></div>
+      {% if remarks %}<span class="status status--warning">{{ remarks|length }}</span>{% endif %}
+    </div>
+    <div class="panel__body">
+      {% if remarks %}
+        <ul class="remark-list">{% for remark in remarks %}{% include "applications/bank/_remark.html" %}{% endfor %}</ul>
+      {% else %}
+        <p class="muted-copy">Замечаний к документам нет.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="panel panel--decision" aria-labelledby="requests-title">
+    <div class="panel__header">
+      <div><h2 id="requests-title">Что нужно от клиента</h2><p>Запросы анализа: что загрузить или уточнить и для чего</p></div>
+      {% if financial.required_requests %}<span class="status status--warning">{{ financial.required_requests }} обязательн.</span>{% endif %}
+    </div>
+    <div class="panel__body">
+      {% if financial.client_requests %}
+        <ol class="request-list">
+          {% for request in financial.client_requests %}
+            <li>
+              <span class="request-list__number">{{ forloop.counter }}</span>
+              <div>
+                <div class="title-line"><strong>{{ request.title }}</strong><span class="status status--{% if request.required %}warning{% else %}neutral{% endif %}">{{ request.priority_label }}</span></div>
+                {% if request.message and request.message != request.title %}<p>{{ request.message }}</p>{% endif %}
+                <small>{{ request.action_label }}{% if request.required_for %} · нужно для: {{ request.required_for|join:", " }}{% endif %}{% if request.filename %} · файл {{ request.filename }}{% endif %}</small>
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+        {% if application.status == 'IN_REVIEW' and can_process_applications %}
+          <form method="post" class="feedback-form" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="form_type" value="action">
+            <label class="form-field">Сообщение клиенту — можно поправить перед отправкой
+              <textarea name="note" class="form-control" rows="7">{{ financial.feedback_draft }}</textarea>
+            </label>
+            <button name="action" value="request_revision" class="button button--decision button--wide">Отправить фидбек клиенту</button>
+            <p class="muted-copy">Заявка вернётся клиенту на доработку, сообщение он увидит в своём кабинете.</p>
+          </form>
+        {% elif application.status == 'SUBMITTED' and can_process_applications %}
+          <p class="muted-copy feedback-hint">Чтобы отправить запрос клиенту, сначала возьмите заявку в работу.</p>
+        {% endif %}
+      {% elif financial.state == 'ready' %}
+        <p class="muted-copy">Анализу ничего не нужно от клиента.</p>
+      {% else %}
+        <p class="muted-copy">Запросы появятся, когда узел завершит анализ документов.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
