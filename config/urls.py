@@ -8,4 +8,6 @@ urlpatterns = [
     path("", include("organizations.urls")),
     path("", include("applications.urls")),
     path("", include("documents.urls")),
+    path("", include("analytics.urls")),
+    path("api/v1/document-node/", include("node_integration.urls")),
 ]

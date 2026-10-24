@@ -15,3 +15,11 @@ models/*
 /tailwindcss.exe
 /tailwindcss
 /core/static/core/css/app.css
+
+# Локальные артефакты запуска dev-сервера и зависимости (не коммитим)
+/.django-server.stderr.log
+/.django-server.stdout.log
+/.tailwind-watch.stderr.log
+/.tailwind-watch.stdout.log
+/.npm-cache/
+/node_modules/

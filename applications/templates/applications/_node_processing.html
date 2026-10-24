@@ -1,0 +1,54 @@
+<section class="panel" aria-labelledby="node-processing-title">
+  <div class="panel__header">
+    <div>
+      <h2 id="node-processing-title">Внешний узел</h2>
+      <p>Отдельная передача во внешний узел. Не заменяет локальный разбор документов и демо-аналитику.</p>
+    </div>
+    {% if node_job %}<span class="status {% if node_job.status == 'COMPLETED' %}status--neutral{% elif node_job.status == 'FAILED' %}status--negative{% elif node_job.status == 'WAITING' or node_job.status == 'UNCERTAIN' %}status--warning{% else %}status--progress{% endif %}">{% if node_job.status == 'COMPLETED' %}Ответ получен{% else %}{{ node_job.get_status_display }}{% endif %}</span>{% endif %}
+  </div>
+  <div class="panel__body">
+    <p class="muted-copy">Справочная информация о внешнем узле, а не решение банка.</p>
+    {% if node_job %}
+      {% if node_job.external_job_id %}<p class="muted-copy">Идентификатор во внешнем узле: <code>{{ node_job.external_job_id }}</code></p>{% endif %}
+      {% if node_job.status == 'PENDING' %}
+        <p>Задание поставлено в очередь на отправку во внешний узел. Отправка ещё не началась.</p>
+      {% elif node_job.status == 'SENDING' %}
+        <p>Задание отправляется во внешний узел. Дождитесь подтверждения; автоматического обновления нет.</p>
+      {% elif node_job.status == 'WAITING' %}
+        <p>Ожидается callback от внешнего узла. Автоматическая повторная отправка не выполняется.</p>
+      {% elif node_job.status == 'COMPLETED' %}
+        <p>Ответ внешнего узла получен. Данные ниже приведены как есть и не являются решением банка.</p>
+        {% if node_job.completed_at %}<p class="muted-copy">Получено: {{ node_job.completed_at|date:"d.m.Y H:i" }}</p>{% endif %}
+        {% if node_result_json %}
+          <details>
+            <summary>Ответ внешнего узла (JSON)</summary>
+            <pre style="max-height: 24rem; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 8px 0 0;">{{ node_result_json }}</pre>
+          </details>
+        {% else %}
+          <p class="muted-copy">Внешний узел сообщил о завершении, но результат отсутствует.</p>
+        {% endif %}
+      {% elif node_job.status == 'FAILED' %}
+        <div class="review-note"><strong>Ошибка внешнего узла.</strong> {% if node_job.last_error %}{{ node_job.last_error }}{% else %}Описание ошибки не предоставлено.{% endif %}</div>
+        <p class="muted-copy">Автоматическая повторная отправка не выполняется.</p>
+      {% elif node_job.status == 'UNCERTAIN' %}
+        <div class="review-note"><strong>Неизвестно, принял ли внешний узел задание.</strong> Автоматическая повторная отправка не выполняется, чтобы не создать дубль. Проверьте результат вручную.</div>
+      {% else %}
+        <p class="muted-copy">Статус внешнего узла неизвестен.</p>
+      {% endif %}
+      <p class="muted-copy"><a href="{% url 'bank-application-detail' application.id %}">Обновить статус</a> — страница не обновляется автоматически.</p>
+    {% else %}
+      <p class="muted-copy">Для этой версии задание внешнего узла не создано. Возможно, заявка создана до подключения интеграции.</p>
+    {% endif %}
+    {% if documents %}
+      <div class="purpose-block"><span>Оригиналы документов</span>
+        <ul>
+          {% for document in documents %}
+            <li>{{ document.original_name }} · {{ document.size|filesizeformat }} · <a href="{% url 'document-download' document.id %}">Скачать оригинал</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% else %}
+      <p class="muted-copy">Документов для скачивания нет.</p>
+    {% endif %}
+  </div>
+</section>

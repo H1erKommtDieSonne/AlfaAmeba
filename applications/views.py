@@ -1,3 +1,5 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -7,7 +9,9 @@ from django import forms
 from django.views.decorators.http import require_GET
 from django.shortcuts import get_object_or_404, redirect, render
 
+from analytics.services import current_analysis_run
 from documents.models import DocumentProcessingJob
+from node_integration.presentation import node_review
 from organizations.models import OrganizationAccessRequest
 from products.models import Product
 from products.advisor import recommend, requirements
@@ -27,6 +31,197 @@ from .services import (
     submit_application,
     submit_revision,
 )
+
+ANALYSIS_STATUS_DISPLAY = {
+    "WAITING": ("Ожидает обработки документов", "status--progress"),
+    "PENDING": ("Готова к запуску", "status--progress"),
+    "PROCESSING": ("Выполняется", "status--progress"),
+    "READY": ("Готова", "status--positive"),
+    "PARTIAL": ("Частичный результат", "status--warning"),
+    "FAILED": ("Ошибка", "status--negative"),
+}
+ANALYSIS_RUNNING_MESSAGES = {
+    "WAITING": "Запуск аналитики ожидает извлечения документов.",
+    "PENDING": "Запуск аналитики готов к выполнению.",
+    "PROCESSING": "Идёт обработка данных. Результат появится после завершения; страницу можно обновить позже.",
+}
+RECOMMENDATION_DISPLAY = {
+    "PROCEED_TO_REVIEW": "Передать на ручное рассмотрение",
+    "REQUEST_INFORMATION": "Запросить дополнительную информацию",
+    "MANUAL_REVIEW": "Требуется ручная проверка",
+}
+SCENARIO_DISPLAY = {
+    "normal": "Стандартный сценарий",
+    "missing_data": "Недостаточно данных",
+    "manual_review": "Ручная проверка",
+}
+COMPONENT_DISPLAY = (
+    ("evidence", "Документы"),
+    ("radar", "Радар показателей"),
+    ("cashflow", "Денежный поток"),
+    ("scoring", "Скоринг"),
+)
+COMPONENT_STATUS_DISPLAY = {
+    "evidence": {
+        "OK": ("Документы разобраны", "status--positive"),
+        "INCOMPLETE": ("Данные неполные", "status--warning"),
+        "UNKNOWN": ("Нет данных", "status--neutral"),
+    },
+    "radar": {
+        "OK": ("Показатели в норме", "status--positive"),
+        "MANUAL_REVIEW": ("Требуется ручная проверка", "status--warning"),
+        "UNKNOWN": ("Нет данных", "status--neutral"),
+    },
+    "cashflow": {
+        "OK": ("Данные доступны", "status--positive"),
+        "UNKNOWN": ("Нет данных", "status--neutral"),
+    },
+    "scoring": {
+        "OK": ("Демо-оценка доступна", "status--positive"),
+        "UNKNOWN": ("Нет данных", "status--neutral"),
+    },
+}
+
+
+def _analysis_components(result):
+    components = result.get("components")
+    if not isinstance(components, dict):
+        components = {}
+    items = []
+    for key, title in COMPONENT_DISPLAY:
+        component = components.get(key)
+        if not isinstance(component, dict):
+            component = {}
+        status = component.get("status", "UNKNOWN")
+        status_label, status_class = COMPONENT_STATUS_DISPLAY[key].get(
+            status, ("Нет данных", "status--neutral")
+        )
+        items.append(
+            {
+                "key": key,
+                "title": title,
+                "status": status,
+                "status_label": status_label,
+                "status_class": status_class,
+                "summary": component.get("summary", ""),
+            }
+        )
+    return items
+
+
+def _analysis_view(run):
+    """Отображаемые подписи для текущего запуска; ошибки воркера не раскрываются."""
+    if run is None:
+        return {"state": "no_analysis", "status_label": "", "status_class": ""}
+
+    status_label, status_class = ANALYSIS_STATUS_DISPLAY.get(
+        run.status, ("Неизвестный статус", "status--neutral")
+    )
+    view = {
+        "state": "running",
+        "status": run.status,
+        "status_label": status_label,
+        "status_class": status_class,
+        "message": ANALYSIS_RUNNING_MESSAGES.get(run.status, ""),
+    }
+    if run.status == "FAILED":
+        view["state"] = "failed"
+        return view
+    if run.status not in {"READY", "PARTIAL"}:
+        return view
+
+    result = run.result if isinstance(run.result, dict) else None
+    if result is None:
+        view["state"] = "unavailable"
+        return view
+
+    recommendation = result.get("recommendation")
+    scenario = result.get("scenario_id")
+    reason_codes = result.get("reason_codes")
+    if not isinstance(reason_codes, list):
+        reason_codes = []
+    view.update(
+        {
+            "state": "result",
+            "is_demo": result.get("is_demo") is True,
+            "recommendation_label": RECOMMENDATION_DISPLAY.get(
+                recommendation, "Рекомендация недоступна"
+            ),
+            "scenario_label": SCENARIO_DISPLAY.get(scenario, "Сценарий не указан"),
+            "summary": result.get("summary", ""),
+            "reason_codes": reason_codes,
+            "components": _analysis_components(result),
+            "model_version": result.get("model_version") or run.model_version,
+            "policy_version": result.get("policy_version") or run.policy_version,
+            "version_number": run.version.version_number,
+            "completed_at": run.completed_at,
+        }
+    )
+    return view
+
+
+def _node_job_for(version):
+    """Задание внешнего узла для версии заявки (интеграция обязательна)."""
+    from node_integration.models import NodeJob
+
+    return NodeJob.objects.filter(version=version).first()
+
+
+def _feedback_groups(queryset):
+    """Безопасные группы замечаний узла: только отображаемые поля, без сырых результатов."""
+    groups = []
+    for feedback in queryset.select_related("job__version"):
+        issues = feedback.issues if isinstance(feedback.issues, list) else []
+        safe_issues = []
+        for issue in issues:
+            if not isinstance(issue, dict):
+                continue
+            safe_issues.append(
+                {
+                    "code": issue.get("code", ""),
+                    "message": issue.get("message", ""),
+                    "field": issue.get("field", ""),
+                    "document_id": issue.get("document_id", ""),
+                    "filename": issue.get("filename", ""),
+                    "suggestion": issue.get("suggestion", ""),
+                }
+            )
+        groups.append(
+            {
+                "feedback_id": str(feedback.feedback_id),
+                "created_at": feedback.created_at,
+                "version_number": feedback.job.version.version_number,
+                "issues": safe_issues,
+            }
+        )
+    return groups
+
+
+def _document_feedback_context(application):
+    """Замечания узла: текущая выбранная версия и история более старых версий."""
+    from node_integration.models import NodeFeedback
+
+    current_number = application.current_version
+    current_qs = NodeFeedback.objects.filter(
+        job__version__application=application,
+        job__version__version_number=current_number,
+    ).order_by("created_at", "feedback_id")
+    history_qs = (
+        NodeFeedback.objects.filter(job__version__application=application)
+        .exclude(job__version__version_number=current_number)
+        .order_by("-created_at", "-job__version__version_number", "feedback_id")
+    )
+    return _feedback_groups(current_qs), _feedback_groups(history_qs)
+
+
+def _node_result_json(node_job):
+    """JSON только для панели банка; шаблон выводит его с автоэкранированием."""
+    if node_job is None or node_job.status != "COMPLETED":
+        return ""
+    result = node_job.result
+    if not isinstance(result, dict):
+        return ""
+    return json.dumps(result, indent=2, ensure_ascii=False, default=str)
 
 
 @login_required
@@ -165,6 +360,8 @@ def business_application_detail(request, application_id):
             else:
                 messages.success(request, "Новая версия заявки отправлена в банк")
                 return redirect("business-application-detail", application_id=application.pk)
+    feedback_current, feedback_history = _document_feedback_context(application)
+    node_job = _node_job_for(version)
     return render(
         request,
         "applications/business_application_detail.html",
@@ -178,6 +375,10 @@ def business_application_detail(request, application_id):
             ),
             "documents": version.documents.all(),
             "processing_job": DocumentProcessingJob.objects.filter(version=version).first(),
+            "document_feedback_current": feedback_current,
+            "document_feedback_history": feedback_history,
+            # Клиенту — только безопасное представление, без сырого результата узла.
+            "node_review": node_review(node_job),
         },
     )
 
@@ -263,6 +464,9 @@ def bank_application_detail(request, application_id):
         .prefetch_related("serialized_documents__source_document")
         .first()
     )
+    analysis_run = current_analysis_run(application)
+    node_job = _node_job_for(version)
+    feedback_current, feedback_history = _document_feedback_context(application)
     return render(
         request,
         "applications/bank_application_detail.html",
@@ -273,5 +477,12 @@ def bank_application_detail(request, application_id):
             "comment_form": comment_form,
             "documents": version.documents.all(),
             "processing_job": processing_job,
+            "analysis_run": analysis_run,
+            "analysis_view": _analysis_view(analysis_run),
+            "node_job": node_job,
+            "node_result_json": _node_result_json(node_job),
+            "node_review": node_review(node_job),
+            "document_feedback_current": feedback_current,
+            "document_feedback_history": feedback_history,
         },
     )

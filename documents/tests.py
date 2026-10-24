@@ -1,12 +1,15 @@
 import json
+from datetime import timedelta
 
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from applications.models import ApplicationEvent
 from core.testing import CreditTestCase
 
 from .models import ApplicationDocument, DocumentProcessingJob, SerializedDocument
+from .queue import claim_next_job, fail_job
 
 HEADERS = {"HTTP_AUTHORIZATION": "Bearer test-llm-token"}
 
@@ -120,3 +123,128 @@ class LlmQueueTests(CreditTestCase):
         job = DocumentProcessingJob.objects.get(pk=claimed["job_id"])
         self.assertEqual(job.status, DocumentProcessingJob.Status.PENDING)
         self.assertEqual(job.last_error, "Временная ошибка OCR")
+        self.assertIsNone(job.completed_at)
+
+    def test_non_retryable_failure_records_completed_at(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        job = DocumentProcessingJob.objects.get()
+        claimed = claim_next_job(worker_id="worker-1")
+
+        fail_job(
+            job_id=job.pk,
+            lease_token=claimed.lease_token,
+            error_message="Неисправимая ошибка OCR",
+            retryable=False,
+        )
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, DocumentProcessingJob.Status.FAILED)
+        self.assertIsNotNone(job.completed_at)
+
+    def test_exhausted_retryable_failure_records_completed_at(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        job = DocumentProcessingJob.objects.get()
+        job.max_attempts = 1
+        job.save(update_fields=("max_attempts",))
+        claimed = claim_next_job(worker_id="worker-1")
+        self.assertEqual(claimed.attempts, 1)
+
+        fail_job(
+            job_id=job.pk,
+            lease_token=claimed.lease_token,
+            error_message="Последняя попытка не удалась",
+            retryable=True,
+        )
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, DocumentProcessingJob.Status.FAILED)
+        self.assertIsNotNone(job.completed_at)
+
+    def test_expired_last_lease_fails_job_instead_of_endless_pending(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        job = DocumentProcessingJob.objects.get()
+        job.max_attempts = 1
+        job.save(update_fields=("max_attempts",))
+
+        claimed = claim_next_job(worker_id="worker-1")
+        self.assertEqual(claimed.attempts, 1)
+        DocumentProcessingJob.objects.filter(pk=job.pk).update(
+            lease_expires_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        self.assertIsNone(claim_next_job(worker_id="worker-2"))
+        job.refresh_from_db()
+        self.assertEqual(job.status, DocumentProcessingJob.Status.FAILED)
+        self.assertIsNotNone(job.completed_at)
+        self.assertIsNone(job.lease_token)
+
+    def test_claim_rejects_non_string_worker_id(self):
+        response = self.client.post(
+            reverse("llm-job-claim"),
+            data=json.dumps({"worker_id": 42}),
+            content_type="application/json",
+            **HEADERS,
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_fail_rejects_non_boolean_retryable(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        claimed = self.client.post(
+            reverse("llm-job-claim"),
+            data=json.dumps({"worker_id": "worker-1"}),
+            content_type="application/json",
+            **HEADERS,
+        ).json()
+
+        failed = self.client.post(
+            reverse("llm-job-fail", args=(claimed["job_id"],)),
+            data=json.dumps(
+                {
+                    "lease_token": claimed["lease_token"],
+                    "error": "Ошибка",
+                    "retryable": "yes",
+                }
+            ),
+            content_type="application/json",
+            **HEADERS,
+        )
+        self.assertEqual(failed.status_code, 400)
+        job = DocumentProcessingJob.objects.get(pk=claimed["job_id"])
+        self.assertEqual(job.status, DocumentProcessingJob.Status.PROCESSING)
+
+    def test_complete_rejects_non_finite_confidence(self):
+        self.client.force_login(self.business_user)
+        self.client.post(reverse("business-cabinet"), self.valid_payload())
+        document = ApplicationDocument.objects.get()
+        claimed = self.client.post(
+            reverse("llm-job-claim"),
+            data=json.dumps({"worker_id": "worker-1"}),
+            content_type="application/json",
+            **HEADERS,
+        ).json()
+
+        completed = self.client.post(
+            reverse("llm-job-complete", args=(claimed["job_id"],)),
+            data=json.dumps(
+                {
+                    "lease_token": claimed["lease_token"],
+                    "documents": [
+                        {
+                            "document_id": str(document.pk),
+                            "document_type": "bank_statement",
+                            "schema_version": "1.0",
+                            "confidence": "NaN",
+                            "payload": {},
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+            **HEADERS,
+        )
+        self.assertEqual(completed.status_code, 409)
+        self.assertFalse(SerializedDocument.objects.exists())

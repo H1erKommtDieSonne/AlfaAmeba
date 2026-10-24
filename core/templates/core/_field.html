@@ -1,6 +1,6 @@
 <label class="form-field">
   {{ field.label }}
   {{ field }}
-  {% if field.errors %}<span class="form-error">{{ field.errors|striptags }}</span>{% endif %}
+  {% if field.errors %}<span class="form-error" id="{{ field.auto_id }}_error">{{ field.errors|striptags }}</span>{% endif %}
 </label>
 

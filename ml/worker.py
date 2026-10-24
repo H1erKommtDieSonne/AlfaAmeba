@@ -6,6 +6,7 @@ import logging
 import multiprocessing
 import os
 import socket
+import sys
 import time
 
 from .analysis import analyze, review_result, summarize
@@ -74,10 +75,16 @@ def run_once(client, worker_id, processor=process_document):
     return True
 
 
-def main():
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # Backwards compatibility: explicit --stage keeps the local demo/stub worker CLI.
+    if any(arg == "--stage" or arg.startswith("--stage=") for arg in argv):
+        from .stub_worker import main as stub_main
+
+        return stub_main(argv)
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # Fail fast for a misconfigured environment, rather than marking every file unreadable.
     import pypdf, openpyxl, defusedxml  # noqa: F401
     client = QueueClient()
@@ -94,6 +101,16 @@ def main():
             return
         if not processed:
             time.sleep(3)
+
+
+# Local demo/stub worker API retained for existing tests and callers.
+# The real extraction pipeline remains process_document/run_once above.
+from .stub_worker import (  # noqa: E402,F401
+    ConfigError,
+    Worker,
+    WorkerConfig,
+    load_config,
+)
 
 
 if __name__ == "__main__":

@@ -1,12 +1,16 @@
 import hashlib
 
+from analytics.services import create_waiting_analysis_run
+from node_integration.services import enqueue_version as enqueue_node_version
+
 from .models import ApplicationDocument, DocumentProcessingJob
 
 
 def save_documents_and_enqueue(version, documents, retained_documents=()):
     """Сохранить файлы версии заявки и поставить одну задачу в очередь LLM.
 
-    Вызывать внутри транзакции отправки: версия, файлы и задача появляются вместе.
+    Вызывать внутри транзакции отправки: версия, файлы, задача извлечения и
+    WAITING-запуск аналитики появляются вместе.
     """
     for entry in documents:
         requirement_code, uploaded_file = entry if isinstance(entry, tuple) else ("", entry)
@@ -29,4 +33,8 @@ def save_documents_and_enqueue(version, documents, retained_documents=()):
             requirement_code=document.requirement_code, content_type=document.content_type,
             size=document.size, sha256=document.sha256,
         )
-    return DocumentProcessingJob.objects.create(version=version)
+    job = DocumentProcessingJob.objects.create(version=version)
+    create_waiting_analysis_run(version)
+    # Постановка в очередь узла — в той же транзакции, но без внешних запросов.
+    enqueue_node_version(version)
+    return job

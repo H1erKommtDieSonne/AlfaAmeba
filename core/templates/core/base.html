@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Кредитный кабинет для бизнеса">
-  <title>{% block title %}Альфа-Банк Бизнес{% endblock %}</title>
+  <title>{% block title %}Деловой кабинет{% endblock %}</title>
   <script>
     (() => {
       try {
@@ -26,7 +26,7 @@
 <body>
   <header class="app-header" x-data="{ mobile: false, account: false, theme: document.documentElement.dataset.theme, toggleTheme() { this.theme = this.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = this.theme; localStorage.setItem('theme', this.theme) } }">
     <div class="app-header__inner">
-      <a href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}" aria-label="Альфа-Банк Бизнес">{% include "core/_logo.html" %}</a>
+      <a href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}" aria-label="Деловой кабинет">{% include "core/_logo.html" %}</a>
       {% if user.is_authenticated %}
         <nav class="header-nav" aria-label="Основная навигация">
           {% if can_submit_applications %}<a href="{% url 'business-applications' %}" class="{% if section == 'business-applications' %}is-active{% endif %}">Мои заявки</a><a href="{% url 'business-cabinet' %}" class="{% if section == 'business' %}is-active{% endif %}">Новая заявка</a>{% endif %}

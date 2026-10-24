@@ -1,0 +1,73 @@
+{% if document_feedback_current or document_feedback_history %}
+<section class="panel feedback-panel" aria-labelledby="document-feedback-title">
+  <div class="panel__header">
+    <div>
+      <h2 id="document-feedback-title">Замечания к документам</h2>
+      <p>Проверка системы, не решение банка. Замечания не подтверждают и не отклоняют заявку.</p>
+    </div>
+    {% if document_feedback_current %}<span class="status status--warning">Текущая версия</span>{% endif %}
+  </div>
+  <div class="panel__body">
+    {% if document_feedback_current %}
+      {% for group in document_feedback_current %}
+        {% if group.issues %}
+          <div class="feedback-group">
+            <p class="feedback-group__meta">Версия №{{ group.version_number }} · {{ group.created_at|date:"d.m.Y H:i" }} · замечаний: {{ group.issues|length }}</p>
+            <ul class="feedback-issues">
+              {% for issue in group.issues %}
+                <li class="feedback-issue">
+                  <div class="feedback-issue__meta">
+                    {% if issue.filename %}<span>Документ: {{ issue.filename }}</span>{% endif %}
+                    {% if issue.field %}<span>Поле: {{ issue.field }}</span>{% endif %}
+                    {% if issue.code %}<span class="feedback-code">{{ issue.code }}</span>{% endif %}
+                  </div>
+                  <p>{{ issue.message|default:"Описание замечания не предоставлено." }}</p>
+                  {% if issue.suggestion %}<p class="feedback-suggestion"><strong>Что сделать:</strong> {{ issue.suggestion }}</p>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% if can_edit %}
+        <a href="#revision-form" class="button button--decision feedback-action">Исправить документы</a>
+      {% else %}
+        {% if can_review_applications %}
+          <p class="muted-copy feedback-action-note">Клиент сможет исправить документы после возврата заявки на доработку.</p>
+        {% else %}
+          <p class="muted-copy feedback-action-note">Исправление откроет сотрудник банка, когда вернёт заявку на доработку.</p>
+        {% endif %}
+      {% endif %}
+    {% else %}
+      <p class="muted-copy">По текущей версии замечаний нет.</p>
+    {% endif %}
+
+    {% if document_feedback_history %}
+      <details class="feedback-history">
+        <summary>Замечания к предыдущим версиям <span class="status status--neutral">{{ document_feedback_history|length }}</span></summary>
+        <p class="muted-copy">Исторические записи не меняются. Отсутствие отметки о закрытии не означает, что замечание исправлено.</p>
+        {% for group in document_feedback_history %}
+          {% if group.issues %}
+            <div class="feedback-group feedback-group--history">
+              <p class="feedback-group__meta">Версия №{{ group.version_number }} · {{ group.created_at|date:"d.m.Y H:i" }} · замечаний: {{ group.issues|length }}</p>
+              <ul class="feedback-issues">
+                {% for issue in group.issues %}
+                  <li class="feedback-issue">
+                    <div class="feedback-issue__meta">
+                      {% if issue.filename %}<span>Документ: {{ issue.filename }}</span>{% endif %}
+                      {% if issue.field %}<span>Поле: {{ issue.field }}</span>{% endif %}
+                      {% if issue.code %}<span class="feedback-code">{{ issue.code }}</span>{% endif %}
+                    </div>
+                    <p>{{ issue.message|default:"Описание замечания не предоставлено." }}</p>
+                    {% if issue.suggestion %}<p class="feedback-suggestion"><strong>Что сделать:</strong> {{ issue.suggestion }}</p>{% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </details>
+    {% endif %}
+  </div>
+</section>
+{% endif %}

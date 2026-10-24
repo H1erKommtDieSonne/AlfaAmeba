@@ -24,6 +24,8 @@ LOCAL_APPS = [
     "products",
     "applications",
     "documents",
+    "analytics",
+    "node_integration",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -92,3 +94,17 @@ ML_SERVICE_URL = env("ML_SERVICE_URL", default="http://127.0.0.1:9000")
 LLM_SERVICE_TOKEN = env("LLM_SERVICE_TOKEN", default="")
 LLM_JOB_LEASE_SECONDS = env.int("LLM_JOB_LEASE_SECONDS", default=600)
 LLM_RETRY_DELAY_SECONDS = env.int("LLM_RETRY_DELAY_SECONDS", default=60)
+
+# Pull-очередь аналитики: отдельный токен, LLM-воркер и сессии сюда не допускаются.
+ANALYTICS_SERVICE_TOKEN = env("ANALYTICS_SERVICE_TOKEN", default="")
+ANALYTICS_JOB_LEASE_SECONDS = env.int("ANALYTICS_JOB_LEASE_SECONDS", default=600)
+ANALYTICS_RETRY_DELAY_SECONDS = env.int("ANALYTICS_RETRY_DELAY_SECONDS", default=60)
+
+# Внешний узел проверки документов. Пустой CALLBACK_TOKEN закрывает приём
+# результатов (503), пока интеграция не настроена.
+DOCUMENT_NODE_ENABLED = env.bool("DOCUMENT_NODE_ENABLED", default=False)
+DOCUMENT_NODE_URL = env("DOCUMENT_NODE_URL", default="http://192.168.1.105:8000")
+DOCUMENT_NODE_API_KEY = env("DOCUMENT_NODE_API_KEY", default="")
+DOCUMENT_NODE_CALLBACK_TOKEN = env("DOCUMENT_NODE_CALLBACK_TOKEN", default="")
+DOCUMENT_NODE_TIMEOUT_SECONDS = env.int("DOCUMENT_NODE_TIMEOUT_SECONDS", default=30)
+DOCUMENT_NODE_POLL_SECONDS = env.int("DOCUMENT_NODE_POLL_SECONDS", default=5)

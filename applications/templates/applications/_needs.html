@@ -4,22 +4,24 @@
   <div x-show="needValue === 'debt'">{% include "core/_field.html" with field=form.debt_kind %}</div>
   {% include "core/_field.html" with field=form.collateral %}
 </div>
-<section class="panel form-section" aria-live="polite" :aria-busy="adviceLoading">
+<section class="panel form-section advice-panel" aria-live="polite" :aria-busy="adviceLoading">
   <div class="panel__body">
-    <h3>Подбор по вашей задаче</h3>
-    <p>Демонстрационный подбор. Условия и список документов уточняет банк.</p>
-    <p x-show="adviceLoading">Обновляем варианты…</p>
-    <p class="form-error" x-show="adviceError" x-text="adviceError"></p>
-    <button x-show="adviceError" type="button" class="button button--secondary" @click="refreshAdvice()">Повторить подбор</button>
-    <p x-text="advice.message"></p>
-    <p x-show="advice.items.length && !advice.selection_matches">Выберите подходящий доступный продукт ниже, чтобы продолжить.</p>
-    <div class="stack">
+    <h3>Предварительный подбор (демо)</h3>
+    <p class="muted-copy">Это не одобрение кредита и не решение банка: подбор показывает возможные продукты по вашей задаче.</p>
+    <p class="advice-state" role="status" x-show="adviceLoading">Обновляем варианты…</p>
+    <p class="form-error" role="alert" x-show="adviceError" x-text="adviceError"></p>
+    <button x-show="adviceError" type="button" class="button button--secondary" @click="refreshAdvice(true)">Повторить подбор</button>
+    <p x-show="!adviceLoading && !adviceError && advice.message" x-text="advice.message"></p>
+    <p class="muted-copy" x-show="!adviceLoading && !adviceError && !advice.items.length">Уточните задачу, сумму и срок. Если подходящих вариантов нет, продолжить нельзя — обратитесь к сотруднику банка.</p>
+    <p class="form-help" x-show="advice.items.length && !advice.selection_matches">Выберите доступный продукт ниже, чтобы продолжить.</p>
+    <div class="stack advice-list">
       <template x-for="item in advice.items" :key="item.code">
-        <article class="purpose-block">
-          <strong x-text="item.name"></strong><p x-text="item.reason"></p>
-          <p x-text="item.conditions"></p>
-          <p x-text="item.limitation"></p>
-          <button type="button" class="button button--secondary" :disabled="!item.available || adviceLoading" @click="chooseProduct(item.code)">Выбрать</button>
+        <article class="advice-card" :class="{ 'advice-card--unavailable': !item.available }">
+          <div class="title-line"><strong x-text="item.name"></strong><span class="status" :class="item.available ? 'status--positive' : 'status--neutral'" x-text="item.available ? 'Доступно для выбора' : 'Подача недоступна'"></span></div>
+          <p x-text="item.reason"></p>
+          <p class="muted-copy" x-show="item.conditions" x-text="item.conditions"></p>
+          <p class="form-error" x-show="item.limitation" x-text="item.limitation"></p>
+          <button type="button" class="button button--secondary" :disabled="!item.available || adviceLoading" :aria-label="item.available ? `Выбрать продукт «${item.name}»` : `Продукт «${item.name}»: подача недоступна`" @click="chooseProduct(item.code)"><span x-text="item.available ? 'Выбрать' : 'Недоступно'"></span></button>
         </article>
       </template>
     </div>

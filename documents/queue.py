@@ -21,16 +21,24 @@ def _locked_jobs(queryset):
 
 @transaction.atomic
 def claim_next_job(*, worker_id=""):
+    if not isinstance(worker_id, str):
+        raise ValidationError("worker_id должен быть строкой")
     now = timezone.now()
-    DocumentProcessingJob.objects.filter(
-        status=DocumentProcessingJob.Status.PROCESSING, lease_expires_at__lt=now,
-        attempts__gte=F("max_attempts"),
-    ).update(status=DocumentProcessingJob.Status.FAILED, last_error="Истёк срок последней попытки обработки",
-             lease_token=None, lease_expires_at=None, claimed_by="", claimed_at=None)
-    DocumentProcessingJob.objects.filter(
+    expired = DocumentProcessingJob.objects.filter(
         status=DocumentProcessingJob.Status.PROCESSING,
         lease_expires_at__lt=now,
-    ).update(
+    )
+    expired.filter(attempts__gte=F("max_attempts")).update(
+        status=DocumentProcessingJob.Status.FAILED,
+        completed_at=now,
+        claimed_at=None,
+        claimed_by="",
+        lease_expires_at=None,
+        lease_token=None,
+        last_error="Истёк срок аренды задачи после последней попытки",
+        updated_at=now,
+    )
+    expired.filter(attempts__lt=F("max_attempts")).update(
         status=DocumentProcessingJob.Status.PENDING,
         available_at=now,
         claimed_at=None,
@@ -38,6 +46,7 @@ def claim_next_job(*, worker_id=""):
         lease_expires_at=None,
         lease_token=None,
         last_error="Истёк срок аренды задачи",
+        updated_at=now,
     )
 
     queryset = (
@@ -170,6 +179,8 @@ def complete_job(*, job_id, lease_token, documents, summary=None):
 
 @transaction.atomic
 def fail_job(*, job_id, lease_token, error_message, retryable=True):
+    if not isinstance(retryable, bool):
+        raise ValidationError("retryable должен быть boolean")
     job = DocumentProcessingJob.objects.select_for_update().get(pk=job_id)
     if job.status != DocumentProcessingJob.Status.PROCESSING:
         raise ValidationError("Задача сейчас не обрабатывается")
@@ -183,8 +194,10 @@ def fail_job(*, job_id, lease_token, error_message, retryable=True):
     if retryable and job.attempts < job.max_attempts:
         job.status = DocumentProcessingJob.Status.PENDING
         job.available_at = timezone.now() + timedelta(seconds=settings.LLM_RETRY_DELAY_SECONDS)
+        job.completed_at = None
     else:
         job.status = DocumentProcessingJob.Status.FAILED
+        job.completed_at = timezone.now()
     job.save(
         update_fields=(
             "status",
@@ -194,6 +207,7 @@ def fail_job(*, job_id, lease_token, error_message, retryable=True):
             "lease_expires_at",
             "lease_token",
             "last_error",
+            "completed_at",
             "updated_at",
         )
     )

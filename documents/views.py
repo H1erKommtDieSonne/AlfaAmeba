@@ -31,15 +31,35 @@ def download_document(request, document_id):
                         content_type="application/octet-stream")
 
 
+def _bearer_token(authorization):
+    """Только точный префикс 'Bearer ' и непустой токен."""
+    prefix = "Bearer "
+    if not isinstance(authorization, str):
+        return None
+    authorization = authorization.strip()
+    if not authorization.startswith(prefix):
+        return None
+    token = authorization[len(prefix) :]
+    return token or None
+
+
+def _tokens_equal(supplied, expected):
+    if not isinstance(supplied, str) or not isinstance(expected, str):
+        return False
+    try:
+        return secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+    except UnicodeError:
+        return False
+
+
 def llm_service_required(view):
     @wraps(view)
     def wrapped(request, *args, **kwargs):
         expected = settings.LLM_SERVICE_TOKEN
-        authorization = request.headers.get("Authorization", "")
-        supplied = authorization.removeprefix("Bearer ").strip()
         if not expected:
             return JsonResponse({"error": "LLM service token is not configured"}, status=503)
-        if not supplied or not secrets.compare_digest(supplied, expected):
+        supplied = _bearer_token(request.headers.get("Authorization", ""))
+        if not _tokens_equal(supplied, expected):
             return JsonResponse({"error": "Unauthorized"}, status=401)
         return view(request, *args, **kwargs)
 
@@ -70,7 +90,10 @@ def claim_job(request):
         payload = _json_body(request, allow_empty=True)
     except ValidationError as error:
         return JsonResponse({"error": "; ".join(error.messages)}, status=400)
-    job = claim_next_job(worker_id=payload.get("worker_id", ""))
+    worker_id = payload.get("worker_id", "")
+    if not isinstance(worker_id, str):
+        return JsonResponse({"error": "worker_id должен быть строкой"}, status=400)
+    job = claim_next_job(worker_id=worker_id)
     if job is None:
         return HttpResponse(status=204)
 
@@ -118,7 +141,7 @@ def download_job_document(request, job_id, document_id):
         or job.lease_expires_at is None
         or job.lease_expires_at <= timezone.now()
         or not supplied_lease
-        or not secrets.compare_digest(supplied_lease, str(job.lease_token))
+        or not _tokens_equal(supplied_lease, str(job.lease_token))
     ):
         return JsonResponse({"error": "Active lease required"}, status=409)
     document.file.open("rb")
@@ -175,11 +198,14 @@ def renew_job_view(request, job_id):
 def fail_job_view(request, job_id):
     try:
         payload = _json_body(request)
+        retryable = payload.get("retryable", True)
+        if not isinstance(retryable, bool):
+            return JsonResponse({"error": "retryable должен быть boolean"}, status=400)
         job = fail_job(
             job_id=job_id,
             lease_token=payload.get("lease_token"),
             error_message=payload.get("error", ""),
-            retryable=payload.get("retryable", True) is not False,
+            retryable=retryable,
         )
     except DocumentProcessingJob.DoesNotExist:
         return JsonResponse({"error": "Job not found"}, status=404)

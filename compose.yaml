@@ -32,6 +32,17 @@ services:
       LLM_SERVICE_TOKEN: ${LLM_SERVICE_TOKEN:-change-me-local-llm-token}
       LLM_JOB_LEASE_SECONDS: ${LLM_JOB_LEASE_SECONDS:-600}
       LLM_RETRY_DELAY_SECONDS: ${LLM_RETRY_DELAY_SECONDS:-60}
+      ANALYTICS_SERVICE_TOKEN: ${ANALYTICS_SERVICE_TOKEN:-change-me-local-analytics-token}
+      ANALYTICS_JOB_LEASE_SECONDS: ${ANALYTICS_JOB_LEASE_SECONDS:-600}
+      ANALYTICS_RETRY_DELAY_SECONDS: ${ANALYTICS_RETRY_DELAY_SECONDS:-60}
+      # Внешний узел выключен по умолчанию. Пустой CALLBACK_TOKEN закрывает
+      # приём результатов (503), пока интеграция не настроена.
+      DOCUMENT_NODE_ENABLED: ${DOCUMENT_NODE_ENABLED:-false}
+      DOCUMENT_NODE_URL: ${DOCUMENT_NODE_URL:-http://192.168.1.105:8000}
+      DOCUMENT_NODE_API_KEY: ${DOCUMENT_NODE_API_KEY:-}
+      DOCUMENT_NODE_CALLBACK_TOKEN: ${DOCUMENT_NODE_CALLBACK_TOKEN:-}
+      DOCUMENT_NODE_TIMEOUT_SECONDS: ${DOCUMENT_NODE_TIMEOUT_SECONDS:-30}
+      DOCUMENT_NODE_POLL_SECONDS: ${DOCUMENT_NODE_POLL_SECONDS:-5}
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media
@@ -85,6 +96,73 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
+      - internal
+
+  # Два независимых pull-воркера на том же образе, что health-сервис ml.
+  # depends_on нет: при старте до Django они сами повторяют запросы.
+  ml-worker-documents:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    command: ["python", "-m", "ml.worker", "--stage", "documents"]
+    environment:
+      WORKER_ID: ${WORKER_ID:-ml-worker}-documents
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-60}
+      WORKER_HTTP_TIMEOUT_SECONDS: ${WORKER_HTTP_TIMEOUT_SECONDS:-30}
+      DEMO_SCENARIO: ${DEMO_SCENARIO:-normal}
+      DJANGO_QUEUE_URL: http://django:8000/api/v1/llm
+      LLM_SERVICE_TOKEN: ${LLM_SERVICE_TOKEN:-change-me-local-llm-token}
+    restart: unless-stopped
+    networks:
+      - internal
+
+  ml-worker-analytics:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    command: ["python", "-m", "ml.worker", "--stage", "analytics"]
+    environment:
+      WORKER_ID: ${WORKER_ID:-ml-worker}-analytics
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-60}
+      WORKER_HTTP_TIMEOUT_SECONDS: ${WORKER_HTTP_TIMEOUT_SECONDS:-30}
+      DEMO_SCENARIO: ${DEMO_SCENARIO:-normal}
+      DJANGO_ANALYTICS_URL: http://django:8000/api/v1/analytics
+      ANALYTICS_SERVICE_TOKEN: ${ANALYTICS_SERVICE_TOKEN:-change-me-local-analytics-token}
+    restart: unless-stopped
+    networks:
+      - internal
+
+  # Опциональный отправитель во внешний узел проверки документов. Без профиля
+  # node-sender сервис не запускается и локальные demo-воркеры выше не меняются.
+  # Тот же образ, БД и media, что у django; web нужен для выхода в LAN, internal —
+  # для доступа к postgres. Запуск: docker compose --profile node-sender up -d.
+  node-sender:
+    profiles: ["node-sender"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "manage.py", "send_node_jobs", "--watch"]
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.prod}
+      DATABASE_URL: postgres://${POSTGRES_USER:-credit}:${POSTGRES_PASSWORD:-credit}@postgres:5432/${POSTGRES_DB:-credit}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-unsafe-docker-development-key}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,django}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-false}
+      DOCUMENT_NODE_ENABLED: ${DOCUMENT_NODE_ENABLED:-false}
+      DOCUMENT_NODE_URL: ${DOCUMENT_NODE_URL:-http://192.168.1.105:8000}
+      DOCUMENT_NODE_API_KEY: ${DOCUMENT_NODE_API_KEY:-}
+      DOCUMENT_NODE_CALLBACK_TOKEN: ${DOCUMENT_NODE_CALLBACK_TOKEN:-}
+      DOCUMENT_NODE_TIMEOUT_SECONDS: ${DOCUMENT_NODE_TIMEOUT_SECONDS:-30}
+      DOCUMENT_NODE_POLL_SECONDS: ${DOCUMENT_NODE_POLL_SECONDS:-5}
+    volumes:
+      - media_data:/app/media:ro
+    depends_on:
+      django:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - web
       - internal
 
 networks:
