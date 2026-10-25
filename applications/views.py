@@ -17,7 +17,7 @@ from documents.models import DocumentProcessingJob
 from node_integration.financial import financial_view
 from node_integration.forms import FinancialInputsForm, statement_formset
 from node_integration.models import FinancialInputs
-from node_integration.presentation import node_review
+from node_integration.presentation import node_financial_summary, node_review
 from node_integration.services import NodeJobBusy, request_recalculation
 from node_integration.services import latest_completed_job as latest_completed_node_job
 from node_integration.services import latest_job as latest_node_job
@@ -271,12 +271,23 @@ def _client_needs(version):
 
 
 def _node_result_json(node_job):
-    """JSON только для панели банка; шаблон выводит его с автоэкранированием."""
+    """JSON только для легаси-панели банка; шаблон экранирует его сам.
+
+    Для финансовой схемы v2 (вложенный ``result.schema_version`` строго ``int``
+    2, включая неполный ``financial_analysis``) сырой JSON не показываем: он
+    может содержать необработанные выходы модели и кредитные решения.
+    Легаси-ответы без такой схемы отображаются как раньше.
+    """
     if node_job is None or node_job.status != "COMPLETED":
         return ""
     result = node_job.result
     if not isinstance(result, dict):
         return ""
+    inner = result.get("result")
+    if isinstance(inner, dict):
+        version = inner.get("schema_version")
+        if isinstance(version, int) and not isinstance(version, bool) and version == 2:
+            return ""
     return json.dumps(result, indent=2, ensure_ascii=False, default=str)
 
 
@@ -592,6 +603,8 @@ def bank_application_detail(request, application_id):
             "node_job": node_job,
             "node_result_json": _node_result_json(shown_node_job),
             "node_review": node_review(shown_node_job),
+            # Безопасная сводка финансового анализа; клиенту не отдаётся.
+            "node_financial_summary": node_financial_summary(shown_node_job),
             "document_feedback_current": feedback_current,
             "document_feedback_history": feedback_history,
             "queue_query": queue_query,

@@ -1,0 +1,90 @@
+{% if node_financial_summary %}
+<section class="panel" aria-labelledby="node-financial-title">
+  <div class="panel__header">
+    <div>
+      <h2 id="node-financial-title">Финансовый разбор документов</h2>
+      <p>{{ node_financial_summary.model_status_message }}</p>
+    </div>
+    {% if node_financial_summary.is_mock is True %}
+      <span class="status status--warning">Демонстрационные данные</span>
+    {% elif node_financial_summary.is_mock is False %}
+      <span class="status status--neutral">Без отметки демонстрационных данных</span>
+    {% else %}
+      <span class="status status--neutral">Источник данных не указан</span>
+    {% endif %}
+  </div>
+  <div class="panel__body">
+    <p class="muted-copy">
+      {% if node_financial_summary.is_mock is True %}Результат сформирован демонстрационным сценарием.
+      {% elif node_financial_summary.is_mock is False %}Отметка о демонстрационных данных отсутствует; это не подтверждение достоверности данных.
+      {% else %}Источник данных не указан; достоверность не проверена.{% endif %}
+      Сводка носит справочный характер и не является решением банка.
+    </p>
+
+    {% if node_financial_summary.readiness %}
+      <div class="purpose-block">
+        <span>Готовность данных</span>
+        <ul class="timeline">
+          {% for item in node_financial_summary.readiness %}
+            <li>
+              <div class="timeline__head">
+                <strong>{{ item.label }}</strong>
+                {% if item.ready is True %}
+                  <span class="status status--positive">Данные готовы</span>
+                {% elif item.ready is False %}
+                  <span class="status status--warning">Недостаточно данных</span>
+                {% else %}
+                  <span class="status status--neutral">Неизвестно</span>
+                {% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <dl class="summary-grid">
+      <div>
+        <dt>Полных месяцев выписки</dt>
+        <dd>{% if node_financial_summary.complete_months is not None %}{{ node_financial_summary.complete_months }}{% else %}Неизвестно{% endif %}</dd>
+      </div>
+      <div>
+        <dt>Годовые входы модели</dt>
+        <dd>{% if node_financial_summary.annual_ready is True %}Данные готовы{% elif node_financial_summary.annual_ready is False %}Недостаточно данных{% else %}Неизвестно{% endif %}</dd>
+      </div>
+      <div>
+        <dt>Прогноз следующего месяца</dt>
+        <dd>{% if node_financial_summary.forecast_ready is True %}Данные готовы{% elif node_financial_summary.forecast_ready is False %}Недостаточно данных{% else %}Неизвестно{% endif %}</dd>
+      </div>
+    </dl>
+
+    {% if node_financial_summary.warnings %}
+      <div class="purpose-block">
+        <span>Замечания к данным</span>
+        <ul>
+          {% for warning in node_financial_summary.warnings %}
+            <li>
+              <span class="status {% if warning.severity == 'high' %}status--negative{% elif warning.severity == 'medium' %}status--warning{% else %}status--neutral{% endif %}">{{ warning.label }}</span>
+              <code>{{ warning.code }}</code>
+              {% if warning.fields %}
+                <span class="muted-copy">Поля: {% for field in warning.fields %}<code>{{ field }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if node_financial_summary.warnings_truncated %}<p class="muted-copy">Список замечаний сокращён.</p>{% endif %}
+      </div>
+    {% endif %}
+
+    {% if node_financial_summary.processing.duration_ms is not None or node_financial_summary.processing.llm_chunks is not None %}
+      <details>
+        <summary>Технические показатели обработки</summary>
+        <p class="muted-copy">
+          {% if node_financial_summary.processing.duration_ms is not None %}Длительность: {{ node_financial_summary.processing.duration_ms }} мс.{% endif %}
+          {% if node_financial_summary.processing.llm_chunks is not None %} Фрагментов LLM: {{ node_financial_summary.processing.llm_chunks }}.{% endif %}
+        </p>
+      </details>
+    {% endif %}
+  </div>
+</section>
+{% endif %}

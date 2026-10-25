@@ -16,7 +16,7 @@ import re
 import secrets
 import socket
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
@@ -40,18 +40,22 @@ MAX_CONTEXT_BYTES = 64 * 1024
 # 2 — прежние поля плюс поля финансового контракта v2 (docs/financial-api-v2.md).
 CONTEXT_SCHEMA_VERSION = 2
 # Продукт Django → loan_type контракта v2; неизвестный продукт тип не получает.
-LOAN_TYPES = {
-    "working-capital": "working_capital",
-    "contract-finance": "contract",
-    "investment": "investment",
-    "refinancing": "refinancing",
-}
-INN_PATTERN = re.compile(r"^(\d{10}|\d{12})$")
 CHECKLIST_SOURCE_SNAPSHOT = "snapshot"
 CHECKLIST_SOURCE_FALLBACK = "fallback"
 CHECKLIST_SOURCE_EMPTY = "empty"
 # Код продукта — slug; не доверяем произвольным меткам каталога.
 PRODUCT_CODE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+# Узел принимает строку loan_type; неизвестный продукт не угадываем.
+LOAN_TYPE_BY_PRODUCT_CODE = {
+    "working-capital": "working_capital",
+    "contract-finance": "contract",
+    "investment": "investment",
+    "refinancing": "refinancing",
+}
+INN_PATTERN = re.compile(r"^[0-9]{10}([0-9]{2})?$")
+MAX_LOAN_AMOUNT = 10**18
+MIN_TERM_MONTHS = 1
+MAX_TERM_MONTHS = 600
 # Запас сверх сетевого таймаута: пока процесс жив, SENDING не считается
 # брошенным; после него задача становится UNCERTAIN и не переотправляется.
 STALE_SENDING_MARGIN_SECONDS = 60
@@ -87,6 +91,24 @@ SYSTEM_PROMPT_TEMPLATE = (
 
 STALE_ERROR = "Отправка не завершилась за отведённое время; результат неизвестен"
 EXTERNAL_ID_CLASH_ERROR = "Идентификатор задачи уже используется другой записью"
+# Узел трактует отсутствующий/нулевой has_collateral как false, поэтому
+# «неизвестно» нельзя отправлять: нужна ручная сверка состава.
+UNKNOWN_COLLATERAL_ERROR = (
+    "Залог не подтверждён: в снимке версии нет строгого true/false. "
+    "Уточните наличие обеспечения вручную перед отправкой задачи узлу"
+)
+INVALID_BORROWER_INN_ERROR = (
+    "ИНН заявителя в снимке версии некорректен; уточните заявителя вручную"
+)
+INVALID_LOAN_AMOUNT_ERROR = (
+    "Сумма заявки в снимке версии некорректна; уточните сумму вручную"
+)
+INVALID_TERM_MONTHS_ERROR = (
+    "Срок заявки в снимке версии некорректен; уточните срок вручную"
+)
+INVALID_ANALYSIS_DATE_ERROR = (
+    "Дата отправки версии некорректна; уточните дату вручную"
+)
 
 
 class OutboundConfigError(Exception):
@@ -238,6 +260,98 @@ def _resolve_collateral(snapshot):
     return value if isinstance(value, bool) else None
 
 
+def _resolve_loan_type(product_code):
+    """Отображение кода продукта в строку loan_type узла; иначе None (не угадываем)."""
+    if product_code is None:
+        return None
+    return LOAN_TYPE_BY_PRODUCT_CODE.get(product_code)
+
+
+def _resolve_borrower_inn(snapshot, version=None):
+    """ИНН: строгая проверка значения снимка, иначе неизменяемое поле заявки.
+
+    Значение снимка старой версии может отсутствовать; тогда берём ИНН заявки.
+    Некорректное присутствующее значение не заменяется догадкой — это отказ.
+    """
+    raw = snapshot.get("inn")
+    if raw is None and version is not None:
+        raw = getattr(getattr(version, "application", None), "inn", None)
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or INN_PATTERN.fullmatch(raw.strip()) is None:
+        raise InvalidOutboundRequest(INVALID_BORROWER_INN_ERROR)
+    return raw.strip()
+
+
+def _resolve_loan_amount(version, snapshot):
+    """Сумма: проверяем значение снимка, иначе неизменяемое поле версии.
+
+    Снимок — исторический источник; поле версии позволяет отправить корректную
+    сумму даже у старых версий. Некорректное присутствующее значение отклоняется.
+    """
+    raw = snapshot.get("amount")
+    if raw is None:
+        raw = getattr(version, "amount", None)
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        raise InvalidOutboundRequest(INVALID_LOAN_AMOUNT_ERROR)
+    try:
+        value = Decimal(str(raw))
+    except (InvalidOperation, ValueError, TypeError) as error:
+        raise InvalidOutboundRequest(INVALID_LOAN_AMOUNT_ERROR) from error
+    if not value.is_finite() or value < 0 or value > Decimal(MAX_LOAN_AMOUNT):
+        raise InvalidOutboundRequest(INVALID_LOAN_AMOUNT_ERROR)
+    return float(value)
+
+
+def _resolve_term_months(version, snapshot):
+    """Срок: проверяем снимок, иначе неизменяемое поле версии; строгий int 1..600."""
+    raw = snapshot.get("term_months")
+    if raw is None:
+        raw = getattr(version, "term_months", None)
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise InvalidOutboundRequest(INVALID_TERM_MONTHS_ERROR)
+    if not MIN_TERM_MONTHS <= raw <= MAX_TERM_MONTHS:
+        raise InvalidOutboundRequest(INVALID_TERM_MONTHS_ERROR)
+    return raw
+
+
+def _resolve_contract_appendices(snapshot):
+    """Только явно подтверждённое поле снимка; отсутствие — не «да»."""
+    value = snapshot.get("contract_appendices_required")
+    return value if isinstance(value, bool) else None
+
+
+def _resolve_analysis_date(version, snapshot):
+    """Детерминированная дата анализа: submitted_at снимка, иначе поле версии."""
+    raw = snapshot.get("submitted_at")
+    moment = None
+    if isinstance(raw, str) and raw.strip():
+        try:
+            moment = datetime.fromisoformat(raw.strip())
+        except ValueError as error:
+            raise InvalidOutboundRequest(INVALID_ANALYSIS_DATE_ERROR) from error
+    if moment is None:
+        moment = getattr(version, "submitted_at", None)
+    if moment is None:
+        return None
+    if isinstance(moment, datetime):
+        return moment.date().isoformat()
+    if isinstance(moment, date):
+        return moment.isoformat()
+    raise InvalidOutboundRequest(INVALID_ANALYSIS_DATE_ERROR)
+
+
+def validate_application_context(context):
+    """Проверить контекст перед сетью: неизвестный залог — ручная сверка, не false."""
+    if isinstance(context, dict) and "has_collateral" in context and context["has_collateral"] is None:
+        raise InvalidOutboundRequest(UNKNOWN_COLLATERAL_ERROR)
+    return context
+
+
 def _clean_text(value, maximum):
     if not isinstance(value, str):
         return None
@@ -284,34 +398,6 @@ def _fallback_checklist(product_code):
     except Exception:
         return []
     return _sanitize_checklist(entries)
-
-
-def _resolve_inn(snapshot, version=None):
-    """ИНН из снимка версии, а у старых снимков без него — с самой заявки."""
-    value = snapshot.get("inn")
-    if value is None and version is not None:
-        value = getattr(getattr(version, "application", None), "inn", None)
-    return value if isinstance(value, str) and INN_PATTERN.fullmatch(value) else None
-
-
-def _positive_number(value):
-    try:
-        number = Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError):
-        return None
-    return float(number) if number.is_finite() and number > 0 else None
-
-
-def _resolve_amount(version, snapshot):
-    """Сумма — с самой версии (она неизменяема после отправки), иначе из снимка."""
-    value = getattr(version, "amount", None)
-    return _positive_number(snapshot.get("amount") if value is None else value)
-
-
-def _resolve_term(version, snapshot):
-    value = getattr(version, "term_months", None)
-    value = snapshot.get("term_months") if value is None else value
-    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
 
 
 def _statement_period(raw):
@@ -397,17 +483,32 @@ def build_application_context(version, *, inputs=None, provider_reports=(), anal
         "collateral": collateral,
         "checklist": checklist,
         "checklist_source": checklist_source,
+        # Новые поля v2: только неизменяемые значения, без догадок и каталога.
+        "document_version": int(version.version_number),
+        "has_collateral": collateral,
     }
-    loan_type = LOAN_TYPES.get(product_code)
+    loan_type = _resolve_loan_type(product_code)
+    borrower_inn = _resolve_borrower_inn(snapshot, version)
+    loan_amount = _resolve_loan_amount(version, snapshot)
+    term_months = _resolve_term_months(version, snapshot)
+    contract_appendices = _resolve_contract_appendices(snapshot)
+    if analysis_date is None:
+        resolved_analysis_date = _resolve_analysis_date(version, snapshot)
+    elif isinstance(analysis_date, datetime):
+        resolved_analysis_date = analysis_date.date().isoformat()
+    elif isinstance(analysis_date, date):
+        resolved_analysis_date = analysis_date.isoformat()
+    else:
+        raise InvalidOutboundRequest(INVALID_ANALYSIS_DATE_ERROR)
     v2 = {
         "document_version": int(version.version_number),
-        "borrower_inn": _resolve_inn(snapshot, version),
+        "borrower_inn": borrower_inn,
         "loan_type": loan_type,
-        "loan_amount_rub": _resolve_amount(version, snapshot),
-        "term_months": _resolve_term(version, snapshot),
-        "has_collateral": collateral is True,
-        "contract_appendices_required": loan_type == "contract",
-        "analysis_date": (analysis_date or timezone.localdate()).isoformat(),
+        "loan_amount_rub": loan_amount,
+        "term_months": term_months,
+        "has_collateral": collateral,
+        "contract_appendices_required": contract_appendices,
+        "analysis_date": resolved_analysis_date,
         **_inputs_context(inputs),
     }
     if provider_reports:
@@ -417,7 +518,7 @@ def build_application_context(version, *, inputs=None, provider_reports=(), anal
 
 
 def _provider_endpoint(raw_url):
-    """База провайдера отчётности (mock-bo) → (host, port, tls, prefix) или ``None``."""
+    """???? ?????????? ?????????? (mock-bo) ? (host, port, tls, prefix) ??? ``None``."""
     if not isinstance(raw_url, str) or not raw_url.strip():
         return None
     try:
@@ -432,16 +533,19 @@ def _provider_endpoint(raw_url):
 
 
 def fetch_provider_reports(version, inputs=None, *, today=None):
-    """Годовая отчётность ООО из провайдера для ``provider_reports``.
+    """??????? ?????????? ??? ?? ?????????? ??? ``provider_reports``.
 
-    Узел сам по произвольным URL не ходит — отчётность приносит Django и передаёт
-    объект провайдера целиком. Провайдер выключен (пустой
-    ``DOCUMENT_NODE_PROVIDER_URL``), недоступен или ответил не тем — отправляем
-    без отчётности: это ухудшает анализ, но не повод не проверять документы.
+    ???? ??? ?? ???????????? URL ?? ????? ? ?????????? ???????? Django ? ????????
+    ?????? ?????????? ???????. ????????? ???????? (??????
+    ``DOCUMENT_NODE_PROVIDER_URL``), ?????????? ??? ??????? ?? ??? ? ??????????
+    ??? ??????????: ??? ???????? ??????, ?? ?? ????? ?? ????????? ?????????.
     """
     endpoint = _provider_endpoint(getattr(settings, "DOCUMENT_NODE_PROVIDER_URL", ""))
-    inn = _resolve_inn(_snapshot_mapping(version), version)
-    # По ИНН из 10 цифр провайдер отдаёт отчётность юрлица; у ИП бухгалтерской отчётности нет.
+    try:
+        inn = _resolve_borrower_inn(_snapshot_mapping(version), version)
+    except InvalidOutboundRequest:
+        return []
+    # ?? ??? ?? 10 ???? ????????? ?????? ?????????? ??????; ? ?? ????????????? ?????????? ???.
     if endpoint is None or inn is None or len(inn) != 10:
         return []
     host, port, use_tls, prefix = endpoint
@@ -469,7 +573,11 @@ def fetch_provider_reports(version, inputs=None, *, today=None):
 
 
 def serialize_application_context(context):
-    """Строгий UTF-8 JSON без NaN/surrogate; превышение 64 KiB — локальный отказ."""
+    """Строгий UTF-8 JSON без NaN/surrogate; превышение 64 KiB — локальный отказ.
+
+    Неизвестный залог отклоняется до сети: узел принял бы ``null`` за ``false``.
+    """
+    validate_application_context(context)
     try:
         text = json.dumps(
             context,

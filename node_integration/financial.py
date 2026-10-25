@@ -12,6 +12,8 @@
 Всё, что здесь выводится, — расчёты узла по данным клиента, а не решение банка.
 """
 
+import math
+
 from .models import NodeJob
 
 SCHEMA_VERSION = 2
@@ -114,7 +116,7 @@ DOCUMENT_FIELD_LABELS = {
 }
 
 MODEL_OUTPUT_FIELDS = (
-    ("decision", "Решение модели", "text"),
+    ("decision", "Рекомендация модели", "text"),
     ("safe_credit_limit_rub_thousands", "Безопасный лимит", "thousands"),
     ("approval_probability_percent", "Вероятность одобрения", "percent"),
     ("default_probability_percent", "Вероятность дефолта", "percent"),
@@ -125,6 +127,27 @@ MODEL_OUTPUT_FIELDS = (
     ("operating_margin_percent", "Операционная маржа (прогноз)", "percent"),
     ("operating_cash_flow_forecast_rub", "Операционный поток (прогноз)", "rub"),
 )
+
+# Строгий белый список статусов вывода модели. Всё прочее — «не запускалась».
+MODEL_STATUS_COMPLETED = "completed"
+MODEL_STATUS_FAILED = "failed"
+MODEL_STATUS_NOT_RUN = "not_run"
+
+# Обязательная оговорка: вывод модели — рекомендация, а не решение банка.
+MODEL_NOT_BANK_DECISION_NOTE = "Не является решением банка."
+# Безопасный технический текст для failed: сырое исключение/note узла наружу не идут.
+MODEL_FAILED_MESSAGE = (
+    "Расчёт ML-модели не выполнен из-за технической ошибки. "
+    "Числовые прогнозы не рассчитаны. " + MODEL_NOT_BANK_DECISION_NOTE
+)
+
+# Только эти проценты — вероятности: обязаны лежать в 0..100. Маржи могут быть любыми.
+PROBABILITY_MODEL_FIELDS = frozenset({
+    "approval_probability_percent",
+    "default_probability_percent",
+    "loss_probability_percent",
+    "liquidity_crisis_probability_percent",
+})
 
 CONCENTRATION_TOP = 5
 # Подсказка интерфейса, а не норматив банка: с какой доли один покупатель заметен.
@@ -476,29 +499,84 @@ def feedback_draft(client_requests):
     return "\n".join(lines)
 
 
+def _model_number(value):
+    """Конечное число без ``bool``/строк/NaN/inf; иначе ``None``.
+
+    Проверка локальная: глобальный ``_num`` намеренно не меняем, чтобы не
+    затрагивать остальные финансовые блоки.
+    """
+    number = _num(value)
+    if number is None or not math.isfinite(number):
+        return None
+    return number
+
+
+def _model_entry(key, label, kind, value):
+    """Готовая пара «подпись → значение» или ``None``, если показывать нечего.
+
+    Для ``completed`` нули — легитимные значения; вероятности вне 0..100,
+    отрицательные суммы и нечисловые/неконечные значения не показываем.
+    """
+    if kind == "text":
+        text = _text(value, 120)
+        return {"label": label, "display": text} if text else None
+    number = _model_number(value)
+    if number is None:
+        return None
+    if key in PROBABILITY_MODEL_FIELDS and not 0.0 <= number <= 100.0:
+        return None
+    if kind in ("thousands", "rub") and number < 0:
+        return None
+    if kind == "thousands":
+        display = money(number * 1000)
+    elif kind == "percent":
+        display = f"{_decimal(number, 1)}\u00a0%"
+    else:
+        display = money(number)
+    return {"label": label, "display": display}
+
+
 def _model_outputs(raw):
+    """Строгий белый список статусов вывода модели.
+
+    ``completed`` — единственный статус, при котором показываем конечные
+    корректные числа. ``failed`` — отдельное сообщение без числовых полей.
+    ``not_run``/отсутствующий/неизвестный статус — «ещё не запускалась».
+    """
     outputs = _dict(raw)
-    run = outputs.get("status") not in (None, "not_run")
-    entries = []
-    for key, label, kind in MODEL_OUTPUT_FIELDS:
-        value = outputs.get(key)
-        if kind == "text":
-            display = _text(value, 120)
-        elif _num(value) is None:
-            display = ""
-        elif kind == "thousands":
-            display = money(_num(value) * 1000)
-        elif kind == "percent":
-            display = f"{_decimal(_num(value), 1)} %"
-        else:
-            display = money(_num(value))
-        if display:
-            entries.append({"label": label, "display": display})
+    status = outputs.get("status")
+    if status == MODEL_STATUS_COMPLETED:
+        entries = [
+            entry for key, label, kind in MODEL_OUTPUT_FIELDS
+            if (entry := _model_entry(key, label, kind, outputs.get(key))) is not None
+        ]
+        return {
+            "run": True,
+            "status": MODEL_STATUS_COMPLETED,
+            "failed": False,
+            "risk_grade": _text(outputs.get("risk_grade"), 10),
+            "entries": entries,
+            "note": _text(outputs.get("note"), 1000),
+            "disclaimer": MODEL_NOT_BANK_DECISION_NOTE,
+        }
+    if status == MODEL_STATUS_FAILED:
+        return {
+            "run": False,
+            "status": MODEL_STATUS_FAILED,
+            "failed": True,
+            "risk_grade": "",
+            "entries": [],
+            "note": MODEL_FAILED_MESSAGE,
+            "disclaimer": MODEL_NOT_BANK_DECISION_NOTE,
+        }
     return {
-        "run": run,
-        "risk_grade": _text(outputs.get("risk_grade"), 10),
-        "entries": entries,
-        "note": _text(outputs.get("note"), 1000),
+        "run": False,
+        "status": MODEL_STATUS_NOT_RUN,
+        "failed": False,
+        "risk_grade": "",
+        "entries": [],
+        "note": "",
+        "disclaimer": "",
     }
 
 

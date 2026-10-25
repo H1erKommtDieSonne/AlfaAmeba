@@ -1,5 +1,6 @@
 .env
 .venv/
+.venv-cpython/
 __pycache__/
 .pytest_cache/
 *.py[cod]
@@ -15,6 +16,9 @@ models/*
 /tailwindcss.exe
 /tailwindcss
 /core/static/core/css/app.css
+
+# Архив с секретами, приложенный вручную; не коммитим
+ollama-docs.zip
 
 # Локальные артефакты запуска dev-сервера и зависимости (не коммитим)
 /.django-server.stderr.log

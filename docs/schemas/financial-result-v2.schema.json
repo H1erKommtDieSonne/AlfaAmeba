@@ -863,11 +863,615 @@
       "title": "ForecastScenario",
       "type": "object"
     },
+    "ModelAudit": {
+      "additionalProperties": false,
+      "properties": {
+        "application_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Application Id"
+        },
+        "document_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Document Version"
+        },
+        "schema_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Schema Version"
+        },
+        "is_mock": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Is Mock"
+        },
+        "input_unit": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Input Unit"
+        },
+        "reporting_year": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reporting Year"
+        },
+        "target_year": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Target Year"
+        },
+        "feature_assumptions": {
+          "items": {
+            "$ref": "#/$defs/ModelAuditFeatureAssumption"
+          },
+          "title": "Feature Assumptions",
+          "type": "array"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelAuditModel"
+        },
+        "model_outputs": {
+          "$ref": "#/$defs/ModelAuditModelOutputs"
+        },
+        "recommendation": {
+          "$ref": "#/$defs/ModelAuditRecommendation"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ModelAuditWarning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "ModelAudit",
+      "type": "object"
+    },
+    "ModelAuditFeatureAssumption": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Field"
+        },
+        "is_observed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Is Observed"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Method"
+        }
+      },
+      "title": "ModelAuditFeatureAssumption",
+      "type": "object"
+    },
+    "ModelAuditModel": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Artifact Sha256"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Duration Ms"
+        },
+        "effective_okved_group": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effective Okved Group"
+        },
+        "model_keys": {
+          "items": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "title": "Model Keys",
+          "type": "array"
+        },
+        "runtime": {
+          "$ref": "#/$defs/ModelAuditRuntime"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version"
+        }
+      },
+      "title": "ModelAuditModel",
+      "type": "object"
+    },
+    "ModelAuditModelOutputs": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status"
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decision"
+        },
+        "risk_grade": {
+          "anyOf": [
+            {
+              "maxLength": 16,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Risk Grade"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Note"
+        },
+        "forecast_revenue_rub_thousands": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Forecast Revenue Rub Thousands"
+        },
+        "safe_credit_limit_rub_thousands": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Safe Credit Limit Rub Thousands"
+        },
+        "net_margin_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Net Margin Percent"
+        },
+        "operating_margin_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operating Margin Percent"
+        },
+        "loss_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loss Probability Percent"
+        },
+        "liquidity_crisis_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Liquidity Crisis Probability Percent"
+        },
+        "default_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Default Probability Percent"
+        },
+        "approval_probability_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approval Probability Percent"
+        },
+        "operating_cash_flow_forecast_rub": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operating Cash Flow Forecast Rub"
+        }
+      },
+      "title": "ModelAuditModelOutputs",
+      "type": "object"
+    },
+    "ModelAuditRecommendation": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Code"
+        },
+        "final_bank_decision": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Final Bank Decision"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Label"
+        },
+        "limit_formula": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Limit Formula"
+        },
+        "policy_version": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Policy Version"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "thresholds": {
+          "$ref": "#/$defs/ModelAuditThresholds"
+        }
+      },
+      "title": "ModelAuditRecommendation",
+      "type": "object"
+    },
+    "ModelAuditRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "joblib": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Joblib"
+        },
+        "lightgbm": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lightgbm"
+        },
+        "numpy": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Numpy"
+        },
+        "pandas": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pandas"
+        },
+        "scikit-learn": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scikit Learn"
+        }
+      },
+      "title": "ModelAuditRuntime",
+      "type": "object"
+    },
+    "ModelAuditThresholds": {
+      "additionalProperties": false,
+      "properties": {
+        "liquidity_crisis_probability_percent_gt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Liquidity Crisis Probability Percent Gt"
+        },
+        "loss_probability_percent_gt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loss Probability Percent Gt"
+        },
+        "net_margin_percent_lt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Net Margin Percent Lt"
+        }
+      },
+      "title": "ModelAuditThresholds",
+      "type": "object"
+    },
+    "ModelAuditWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Code"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Message"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "maxLength": 16,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Severity"
+        }
+      },
+      "title": "ModelAuditWarning",
+      "type": "object"
+    },
     "ModelOutputs": {
       "additionalProperties": false,
       "properties": {
         "status": {
-          "const": "not_run",
+          "enum": [
+            "not_run",
+            "completed",
+            "failed"
+          ],
           "title": "Status",
           "type": "string"
         },
@@ -1377,6 +1981,9 @@
     },
     "model_outputs": {
       "$ref": "#/$defs/ModelOutputs"
+    },
+    "model_audit": {
+      "$ref": "#/$defs/ModelAudit"
     },
     "document_fields": {
       "items": {

@@ -48,6 +48,7 @@
 {% include "applications/_document_analysis.html" %}
 {% include "applications/_node_processing.html" %}
 {% include "applications/_node_review.html" %}
+{% if not financial or financial.state != 'ready' %}{% include "applications/_node_financial.html" %}{% endif %}
 {% include "applications/_document_feedback.html" %}
           <section class="panel" aria-labelledby="analysis-title">
             <div class="panel__header">

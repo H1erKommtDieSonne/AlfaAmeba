@@ -65,6 +65,9 @@
           {% for entry in financial.model_outputs.entries %}<div><dt>{{ entry.label }}</dt><dd>{{ entry.display }}</dd></div>{% endfor %}
         </dl>
         {% if financial.model_outputs.note %}<p class="muted-copy">{{ financial.model_outputs.note }}</p>{% endif %}
+        {% if financial.model_outputs.disclaimer %}<p class="muted-copy">{{ financial.model_outputs.disclaimer }}</p>{% endif %}
+      {% elif financial.model_outputs.failed %}
+        <div class="review-note">{{ financial.model_outputs.note }}</div>
       {% else %}
         <p class="muted-copy">ML-модель ещё не запускалась. Риск-грейд, вероятности и безопасный лимит появятся после её расчёта по годовым показателям{% if not financial.readiness.items.0.ready %} — для этого сначала нужны все годовые входы{% endif %}.</p>
       {% endif %}

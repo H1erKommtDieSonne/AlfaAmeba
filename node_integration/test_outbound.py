@@ -107,13 +107,14 @@ class OutboundTestBase(CreditTestCase):
         return self.settings(**values)
 
     def _make_version(self, number=1):
+        submitted_at = timezone.now()
         application = Application.objects.create(
             organization=self.organization,
             organization_name=self.organization.name,
             inn=self.organization.inn,
             created_by=self.business_user,
             status=Application.Status.SUBMITTED,
-            submitted_at=timezone.now(),
+            submitted_at=submitted_at,
         )
         return ApplicationVersion.objects.create(
             application=application,
@@ -122,8 +123,16 @@ class OutboundTestBase(CreditTestCase):
             amount="1500000.00",
             term_months=12,
             purpose="Закупка сезонной партии товара на три месяца",
-            submitted_at=timezone.now(),
-            snapshot={"source": "test"},
+            submitted_at=submitted_at,
+            snapshot={
+                "source": "test",
+                "inn": self.organization.inn,
+                "product_code": self.product.code,
+                "amount": "1500000.00",
+                "term_months": 12,
+                "needs": {"collateral": False},
+                "submitted_at": submitted_at.isoformat(),
+            },
         )
 
     def _add_document(
