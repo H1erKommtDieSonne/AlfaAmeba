@@ -1,5 +1,8 @@
 # Запуск AlfaAmeba и DocumentNode Portable
 
+# Отчет с пояснениями 
+[ДЛЯ ЖОРИ ОТЧЕТ ПО ПРОЕКТУ.pdf](ДЛЯ ЖОРИ ОТЧЕТ ПО ПРОЕКТУ.pdf)
+
 Инструкция по комплекту от 26.10.2026: `AlfaAmeba-backend-current.tar.gz`,
 `DocumentNode-Portable-previous.zip`, `Successful-Mock-Applications.zip`.
 Параметры сверены с исходниками этих архивов. Если используется более новая версия,
