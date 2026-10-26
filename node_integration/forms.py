@@ -191,7 +191,7 @@ StatementFormSet = forms.formset_factory(
 )
 
 
-def statement_formset(data=None, *, version, inputs=None, accounts=()):
+def statement_formset(data=None, *, version, inputs=None, accounts=(), suggestions=None):
     """Формы периодов: сохранённые строки плюс строка на каждую ещё не описанную выписку.
 
     Выбрать можно любой файл версии, а заранее подставляются только те, что клиент
@@ -200,9 +200,16 @@ def statement_formset(data=None, *, version, inputs=None, accounts=()):
     documents = list(version.documents.order_by("created_at").values_list("original_name", "requirement_code"))
     filenames = list(dict.fromkeys(name for name, _ in documents))
     initial = []
-    for period in (inputs.statement_periods if inputs else []) or []:
-        if isinstance(period, dict):
-            initial.append({**period, "complete": period.get("complete") is True})
+    if inputs:
+        for period in inputs.statement_periods or []:
+            if isinstance(period, dict):
+                initial.append({**period, "complete": period.get("complete") is True})
+    elif suggestions:
+        # Suggestions are drafts only: filename/account/period may be prefilled,
+        # balances stay empty and complete can be set only by the employee.
+        for row in suggestions.get("rows") or []:
+            if isinstance(row, dict) and row.get("filename"):
+                initial.append({**row, "complete": False})
     described = {row.get("filename") for row in initial}
     statements = list(dict.fromkeys(name for name, code in documents if code == "statement" and name not in described))
     initial += [{"filename": name} for name in statements][: max(0, MAX_STATEMENTS - len(initial))]

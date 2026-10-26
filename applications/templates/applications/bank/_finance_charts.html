@@ -4,7 +4,7 @@
   <div class="panel__header">
     <div>
       <h2 id="cashflow-title">Денежный поток по выписке</h2>
-      <p>{% if financial.cash_flow.months %}Полных месяцев: {{ financial.cash_flow.complete_months }} · счета {% if financial.cash_flow.accounts_confirmed %}подтверждены банком{% else %}не подтверждены — поток может быть неполным{% endif %}{% else %}Месячных итогов нет{% endif %}</p>
+      <p>{% if financial.cash_flow.months %}Месяцев в разбивке: {{ financial.cash_flow.months|length }} · полных: {{ financial.cash_flow.complete_months }} · счета {% if financial.cash_flow.accounts_confirmed %}подтверждены сотрудником{% else %}не подтверждены — поток может быть неполным{% endif %}{% else %}Нода не сформировала месячную разбивку. Это не означает, что файл не загружен.{% endif %}</p>
     </div>
     {% if financial.cash_flow.months %}<span class="status status--neutral">ср. остаток {{ financial.cash_flow.average_balance }}</span>{% endif %}
   </div>
@@ -23,10 +23,20 @@
             </tbody>
           </table>
         </div>
-        <p class="muted-copy">«Все поступления/списания» включают переводы между своими счетами и полученные займы — это не выручка и не операционные расходы.</p>
+        <p class="muted-copy">«Все поступления/списания» включают переводы между своими счетами и полученные займы — это не выручка и не операционные расходы. Неполные месяцы не скрываются и не заменяются оценкой.</p>
       </details>
     {% else %}
-      <p class="muted-copy">Узел не получил месячных итогов выписки: график строится после загрузки выписки.</p>
+      <div class="review-note">
+        <p><strong>Нода не сформировала месячную разбивку. Это не означает, что файл не загружен.</strong></p>
+        <p class="muted-copy">Чтобы нода собрала месяцы, приложите выписку отдельным CSV-файлом в пункте «Выписка»:</p>
+        <ul class="check-list">
+          <li>кодировка UTF-8, разделитель — запятая или точка с запятой, файл до 10 МБ;</li>
+          <li>обязательный заголовок: <code>transaction_id,account_id,date,direction,amount,currency,category,counterparty_id</code>;</li>
+          <li>дата в формате ISO, сумма в рублях с копейками, направление <code>in</code> или <code>out</code>;</li>
+          <li>категория из согласованного списка, например <code>customer_receipt</code> или <code>operating_payment</code>; <code>counterparty_id</code> нужен для концентрации покупателей.</li>
+        </ul>
+        <p class="muted-copy">Обычный CSV, PDF или Excel без этих колонок идёт через извлечение и может не дать месячных итогов; это не признак отсутствия файла.</p>
+      </div>
     {% endif %}
   </div>
 </section>
@@ -36,7 +46,7 @@
     <div class="panel__header">
       <div>
         <h2 id="forecast-title">Прогноз остатка{% if financial.forecast.period %} на {{ financial.forecast.period }}{% endif %}</h2>
-        <p>{% if financial.forecast.ready %}От факта на {{ financial.forecast.data_as_of }} · платёж по новому кредиту — в целевом месяце{% else %}Прогноз не построен{% endif %}</p>
+        <p>{% if financial.forecast.ready %}От факта на {{ financial.forecast.data_as_of }} · платёж по новому кредиту — в целевом месяце{% else %}Прогноз не построен: проверьте условия готовности ниже{% endif %}</p>
       </div>
     </div>
     <div class="panel__body">
@@ -46,7 +56,21 @@
           <details class="chart-table"><summary>Допущения прогноза</summary><ul class="check-list">{% for item in financial.forecast.limitations %}<li>{{ item }}</li>{% endfor %}</ul></details>
         {% endif %}
       {% else %}
-        <p class="muted-copy">Нужны минимум три последовательных полных месяца выписки по всем подтверждённым счетам и согласованные остатки.</p>
+        <div class="review-note">
+          <p><strong>Прогноз не построен.</strong> Причина может быть в счетах, периоде и остатках или в данных по долгу и платежу. Нода не подставляет отсутствующие данные оценкой и не скрывает неполные месяцы.</p>
+          <ul class="check-list">
+            <li>{% if not financial.cash_flow.accounts_confirmed %}Подтвердите все расчётные счета клиента — сейчас они не подтверждены.{% else %}Расчётные счета подтверждены; проверьте, что список полный.{% endif %}</li>
+            <li>Подтвердите период каждой выписки: предзаполненный период — только предложение.</li>
+            <li>Заполните остатки на начало и на конец месяца; без них полнота не подтверждается.</li>
+            <li>Отметьте «Выписка полная за весь период»: для прогноза нужно минимум 3 последовательных полных месяца, сейчас {{ financial.cash_flow.complete_months }}.</li>
+            <li>Проверьте подтверждение графика долга и платежа по новому кредиту: их отсутствие тоже может блокировать прогноз.</li>
+          </ul>
+          {% if financial.cash_flow.months %}
+            <p class="muted-copy">В разбивке {{ financial.cash_flow.months|length }} мес., полными признано {{ financial.cash_flow.complete_months }}. Неполные строки остаются в таблице выше.</p>
+          {% else %}
+            <p class="muted-copy">Месячной разбивки пока нет; выше описаны требования к CSV и ручному подтверждению.</p>
+          {% endif %}
+        </div>
       {% endif %}
     </div>
   </section>
@@ -59,7 +83,7 @@
       {% if financial.chart_data.concentration %}
         <div class="chart-box"><canvas data-chart="concentration" data-source="financial-chart-data" role="img" aria-label="Доли покупателей в поступлениях"></canvas></div>
       {% else %}
-        <p class="muted-copy">Покупатели в выписке не размечены — концентрацию посчитать нельзя.</p>
+        <p class="muted-copy">Покупатели в выписке не размечены — концентрацию посчитать нельзя. Пустые <code>counterparty_id</code> не заменяются вымышленными покупателями.</p>
       {% endif %}
     </div>
   </section>

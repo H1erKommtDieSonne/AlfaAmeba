@@ -458,6 +458,7 @@ def _concentration(months):
 
 def _warnings(raw):
     items = []
+    grouped = {}
     for raw_item in _list(raw):
         item = _dict(raw_item)
         message = _text(item.get("message"), 1000)
@@ -465,13 +466,32 @@ def _warnings(raw):
             continue
         severity = item.get("severity") if item.get("severity") in SEVERITY_DISPLAY else ""
         label, tone = SEVERITY_DISPLAY.get(severity, ("", TONE_NEUTRAL))
-        items.append({
-            "code": _text(item.get("code"), 64),
+        code = _text(item.get("code"), 64)
+        # A single finding may arrive once per metric, or from both finance and ML.
+        # Different messages with the same code remain separate findings.
+        key = (code, " ".join(message.split()).casefold())
+        fields = list(dict.fromkeys(
+            field for field in _list(item.get("fields")) if isinstance(field, str) and field.strip()
+        ))
+        if key in grouped:
+            existing = grouped[key]
+            existing["fields"] = list(dict.fromkeys(existing["fields"] + fields))
+            if SEVERITY_ORDER.get(severity, len(SEVERITY_ORDER)) < SEVERITY_ORDER.get(existing["severity"], len(SEVERITY_ORDER)):
+                existing.update(severity=severity, severity_label=label, tone=tone)
+            continue
+        warning = {
+            "code": code,
             "message": message,
             "severity": severity,
             "severity_label": label,
             "tone": tone,
-        })
+            "fields": fields,
+            "field_labels": [],
+        }
+        grouped[key] = warning
+        items.append(warning)
+    for item in items:
+        item["field_labels"] = [ANNUAL_LABELS.get(field, STATISTIC_LABELS.get(field, field)) for field in item["fields"]]
     items.sort(key=lambda item: SEVERITY_ORDER.get(item["severity"], len(SEVERITY_ORDER)))
     return items
 

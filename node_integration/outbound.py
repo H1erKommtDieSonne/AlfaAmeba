@@ -683,7 +683,7 @@ def prepare_request(job):
     inputs = FinancialInputs.objects.filter(version=version).first()
     application_context = serialize_application_context(
         build_application_context(
-            version, inputs=inputs, provider_reports=fetch_provider_reports(version, inputs)
+            version, inputs=inputs
         )
     )
     boundary = f"----DjangoNodeBoundary{secrets.token_hex(16)}"

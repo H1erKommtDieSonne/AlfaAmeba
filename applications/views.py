@@ -16,6 +16,7 @@ from analytics.services import current_analysis_run
 from documents.models import DocumentProcessingJob
 from node_integration.financial import financial_view
 from node_integration.forms import FinancialInputsForm, statement_formset
+from node_integration.statement_metadata import build_statement_suggestions
 from node_integration.models import FinancialInputs
 from node_integration.presentation import node_financial_summary, node_review
 from node_integration.services import NodeJobBusy, request_recalculation
@@ -566,12 +567,25 @@ def bank_application_detail(request, application_id):
     queue_query = f"?{urlencode({'status': queue_status})}" if queue_status is not None else ""
     detail_url = reverse("bank-application-detail", args=[application.pk]) + queue_query
     version = application.versions.get(version_number=application.current_version)
+    node_job, shown_node_job = _node_jobs(version)
+    financial = financial_view(shown_node_job)
     inputs = FinancialInputs.objects.filter(version=version).select_related("confirmed_by").first()
+    # Подсказки читают только уже загруженный CSV и/или прошлый callback. Они
+    # не подтверждают остатки и не подменяют сохранённые FinancialInputs.
+    suggestions = (
+        build_statement_suggestions(version, financial=financial)
+        if inputs is None and request.method != "POST"
+        else None
+    )
     can_confirm_inputs = _can_confirm_inputs(request.user, application)
     action_form = ReviewActionForm()
     comment_form = CommentForm()
     inputs_form = FinancialInputsForm(instance=inputs, version=version)
-    statements = statement_formset(version=version, inputs=inputs)
+    if inputs is None and suggestions and suggestions["accounts"]:
+        inputs_form.initial["accounts"] = "\n".join(suggestions["accounts"])
+    statements = statement_formset(
+        version=version, inputs=inputs, suggestions=suggestions
+    )
     if request.method == "POST":
         if request.POST.get("form_type") == "comment":
             comment_form = CommentForm(request.POST)
@@ -620,9 +634,7 @@ def bank_application_detail(request, application_id):
         .first()
     )
     analysis_run = current_analysis_run(application)
-    node_job, shown_node_job = _node_jobs(version)
     feedback_current, feedback_history = _document_feedback_context(application, shown_node_job)
-    financial = financial_view(shown_node_job)
     return render(
         request,
         "applications/bank_application_detail.html",
@@ -652,6 +664,8 @@ def bank_application_detail(request, application_id):
             "can_confirm_inputs": can_confirm_inputs,
             "inputs_form": inputs_form,
             "statements": statements,
+            # Сводка черновых подсказок для staff-интерфейса. Клиенту не отдаётся.
+            "statement_suggestions": suggestions,
         },
     )
 

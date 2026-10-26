@@ -37,7 +37,7 @@
           {% for warning in financial.warnings %}
             <li class="signal signal--{{ warning.tone }}">
               <span class="signal__dot" aria-hidden="true"></span>
-              <p>{{ warning.message }}</p>
+              <p>{{ warning.message }}{% if warning.field_labels %}<br><small class="muted-copy">Поля: {{ warning.field_labels|join:", " }}</small>{% endif %}</p>
               {% if warning.severity_label %}<span class="status status--{{ warning.tone }}">{{ warning.severity_label }}</span>{% endif %}
             </li>
           {% endfor %}
