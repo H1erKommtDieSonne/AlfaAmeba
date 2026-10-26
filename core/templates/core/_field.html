@@ -1,6 +1,6 @@
-<label class="form-field">
-  {{ field.label }}
+﻿<label class="form-field">
+  {% if sr_label %}<span class="sr-only">{{ field.label }}</span>{% else %}{{ field.label }}{% endif %}
   {{ field }}
-  {% if field.errors %}<span class="form-error" id="{{ field.auto_id }}_error">{{ field.errors|striptags }}</span>{% endif %}
+  {% if show_help and field.help_text %}<span class="form-help" id="{{ field.auto_id }}_help">{{ field.help_text }}</span>{% endif %}
+  {% if field.errors %}<span class="form-error" id="{{ field.auto_id }}_error" role="alert">{{ field.errors|striptags }}</span>{% endif %}
 </label>
-

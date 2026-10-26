@@ -71,7 +71,7 @@ class AdvisorTests(CreditTestCase):
         version = Application.objects.get().versions.get()
         self.assertEqual(version.snapshot["needs"]["need"], "equipment")
         self.assertEqual(set(version.documents.values_list("requirement_code", flat=True)), {"statement", "estimate"})
-        self.assertEqual(version.snapshot["recommendation"]["rules_version"], "needs-1")
+        self.assertEqual(version.snapshot["recommendation"]["rules_version"], "needs-2")
         self.assertContains(self.client.get(reverse("business-application-detail", args=[version.application_id])), "Смета или предложение поставщика")
 
     def test_revision_reuses_documents_and_preserves_previous_version(self):
@@ -91,12 +91,18 @@ class AdvisorTests(CreditTestCase):
         self.assertEqual(current.documents.count(), 2)
         self.assertEqual(old.snapshot["needs"]["need"], "working")
 
-    def test_upload_limits_cover_all_typed_slots(self):
+    def test_required_typed_upload_format_and_size_are_validated(self):
         payload = self.valid_payload()
-        files = {"document_statement": payload.pop("document_statement"), "document_estimate": [attachment("script.exe")]}
-        form = ApplicationForm(payload, files)
+        payload.pop("document_statement")
+        form = ApplicationForm(payload, {"document_statement": [attachment("script.exe")]})
         self.assertFalse(form.is_valid())
-        self.assertIn("document_estimate", form.errors)
+        self.assertIn("document_statement", form.errors)
+
+        oversized = attachment("statement.pdf")
+        oversized.size = ApplicationForm.MAX_DOCUMENT_SIZE + 1
+        form = ApplicationForm(payload, {"document_statement": [oversized]})
+        self.assertFalse(form.is_valid())
+        self.assertIn("document_statement", form.errors)
 
     def test_generic_attachment_does_not_satisfy_required_slot(self):
         payload = self.valid_payload()
@@ -111,16 +117,17 @@ class AdvisorTests(CreditTestCase):
         response = self.client.post(reverse("business-cabinet"), payload)
         self.assertIn("document_collateral", response.context["form"].errors)
 
-    def test_combined_upload_limit_includes_extra_typed_files(self):
+    def test_total_and_count_guards_on_actual_generic_uploads(self):
         payload = self.valid_payload()
         payload.pop("document_statement")
-        files = {}
-        for code in ["statement", "estimate", "contract"]:
-            file = attachment()
-            file.size = 18 * 1024 * 1024
-            files[f"document_{code}"] = [file]
-        form = ApplicationForm(payload, files)
+        files = []
+        for index in range(6):
+            file = attachment(f"generic-{index}.pdf")
+            file.size = 9 * 1024 * 1024
+            files.append(file)
+        form = ApplicationForm(payload, {"documents": files})
         self.assertFalse(form.is_valid())
+        self.assertIn("не более 5", " ".join(form.non_field_errors()))
         self.assertIn("Общий размер документов превышает 50 МБ", form.non_field_errors())
 
     def test_revision_replacement_keeps_old_file(self):

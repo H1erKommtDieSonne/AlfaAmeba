@@ -8,35 +8,18 @@ from .models import Organization, OrganizationAccessRequest, OrganizationMembers
 
 
 def organization_for_submission(*, inn, name, user):
-    """Организация, от имени которой человек вправе подать заявку.
+    """Организация для связи заявки с реквизитами, без проверки полномочий.
 
-    Возвращает пару (организация, запрос доступа): если членства ещё нет, вместо
-    организации заводится запрос на подтверждение полномочий — ИНН сам по себе
-    доступа не даёт. Вызывать внутри транзакции: строка организации блокируется.
+    ИНН не открывает доступ к уже поданным заявкам: заявка всегда принадлежит
+    отправителю и видна ему по правилам создателя. Существующая организация
+    переиспользуется только как связь по уникальному ИНН — её название не
+    переименовывается и не подменяет введённые отправителем данные. Новых
+    запросов доступа и членств здесь не создаётся. Вызывать внутри транзакции:
+    строка организации блокируется.
     """
     organization = Organization.objects.select_for_update().filter(inn=inn).first()
     if organization is None:
         organization = Organization.objects.create(name=name, inn=inn)
-
-    membership = OrganizationMembership.objects.filter(
-        organization=organization, user=user, is_active=True
-    ).first()
-    if membership is None:
-        access_request, _ = OrganizationAccessRequest.objects.update_or_create(
-            organization=organization,
-            user=user,
-            defaults={
-                "status": OrganizationAccessRequest.Status.PENDING,
-                "reviewed_by": None,
-                "review_note": "",
-                "reviewed_at": None,
-            },
-        )
-        return None, access_request
-    if membership.role == OrganizationMembership.Role.VIEWER:
-        raise PermissionDenied("У вас нет права отправлять заявки этой организации")
-    if organization.verification_status != Organization.VerificationStatus.VERIFIED:
-        raise ValidationError("Организация ещё не прошла подтверждение")
     return organization, None
 
 

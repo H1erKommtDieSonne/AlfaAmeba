@@ -166,17 +166,42 @@ class FinancialViewDemoTests(SimpleTestCase):
 
 
 class FinancialViewStateTests(SimpleTestCase):
-    def test_not_completed_or_missing_job(self):
-        self.assertIsNone(financial_view(None))
-        self.assertIsNone(financial_view(NodeJob(status=NodeJob.Status.WAITING)))
+    def test_not_completed_or_missing_job_keeps_report_state(self):
+        no_job = financial_view(None)
+        self.assertEqual(no_job["state"], "no_job")
+        self.assertEqual(no_job["final_analysis"]["state"], "not_run")
+        self.assertFalse(no_job["model_outputs"]["run"])
+
+        pending = financial_view(NodeJob(status=NodeJob.Status.WAITING))
+        self.assertEqual(pending["state"], "pending")
+        self.assertEqual(
+            pending["final_analysis"]["message"],
+            "Выполняется обработка заявки. Результат появится после завершения.",
+        )
+        self.assertFalse(pending["model_outputs"]["run"])
+
+        failed = financial_view(NodeJob(status=NodeJob.Status.FAILED))
+        self.assertEqual(failed["state"], "failed")
+        self.assertIn("не выполнялся", failed["final_analysis"]["message"])
 
     def test_processing_error(self):
         payload = {"status": "completed", "result": {"status": "processing_error", "financial_analysis": None}}
-        self.assertEqual(financial_view(completed(payload)), {"state": "processing_error"})
+        view = financial_view(completed(payload))
+        self.assertEqual(view["state"], "processing_error")
+        self.assertEqual(view["final_analysis"]["state"], "not_run")
+        self.assertIn("не удалось обработать документы", view["final_analysis"]["message"])
+        self.assertIn("технической ошибкой", view["model_outputs"]["note"])
+        self.assertFalse(view["model_outputs"]["run"])
 
     def test_old_result_is_unsupported(self):
         payload = {"status": "completed", "result": {"status": "complete", "summary": "старый формат"}}
-        self.assertEqual(financial_view(completed(payload)), {"state": "unsupported"})
+        view = financial_view(completed(payload))
+        self.assertEqual(view["state"], "unsupported")
+        self.assertEqual(
+            view["final_analysis"]["message"],
+            "Для этой обработки итоговый анализ нейросети не выполнялся.",
+        )
+        self.assertFalse(view["model_outputs"]["run"])
 
     def test_garbage_fields_do_not_break_view(self):
         payload = load("node-result.json")

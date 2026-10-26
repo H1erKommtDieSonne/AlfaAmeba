@@ -1,4 +1,4 @@
-{% extends "core/base.html" %}
+﻿{% extends "core/base.html" %}
 {% block title %}Мои заявки · Деловой кабинет{% endblock %}
 {% block content %}
 <main class="content-main">
@@ -9,10 +9,14 @@
   <section class="panel">
     {% if rows %}
       <div class="data-table-wrap"><table class="data-table">
-        <thead><tr><th>Заявка</th><th>Компания</th><th>Продукт</th><th class="num">Сумма</th><th>Версия</th><th>Статус</th></tr></thead>
+        <thead><tr><th>ID заявки</th><th>Компания</th><th>Продукт</th><th class="num">Сумма</th><th>Версия</th><th>Отправлена</th><th>Статус</th></tr></thead>
         <tbody>{% for row in rows %}<tr>
-          <td><a href="{% url 'business-application-detail' row.application.id %}">№{{ row.application.id|stringformat:"s"|slice:":8"|upper }}</a></td>
-          <td>{{ row.application.organization_name }}<small>ИНН {{ row.application.inn }}</small></td><td>{{ row.version.product.name }}</td><td class="num">{{ row.version.amount|floatformat:"0g" }} ₽</td><td>№{{ row.version.version_number }}</td>
+          <td><a href="{% url 'business-application-detail' row.application.id %}" class="id-code" aria-label="Открыть заявку {{ row.application.id }}">ID {{ row.application.id|stringformat:"s"|slice:":8"|upper }}</a><span class="sr-only">Полный идентификатор: {{ row.application.id }}</span></td>
+          <td>{{ row.application.organization_name }}<small>ИНН {{ row.application.inn }}</small></td>
+          <td>{{ row.version.product.name }}</td>
+          <td class="num">{{ row.version.amount|floatformat:"0g" }} ₽</td>
+          <td><span class="id-code">Версия {{ row.version.version_number }}</span></td>
+          <td>{{ row.application.submitted_at|date:"d.m.Y H:i"|default:"—" }}</td>
           <td><span class="status {% if row.application.status == 'APPROVED' %}status--positive{% elif row.application.status == 'DECLINED' %}status--negative{% elif row.application.status == 'NEEDS_REVISION' or row.application.status == 'PENDING_APPROVAL' %}status--warning{% elif row.application.status == 'IN_REVIEW' or row.application.status == 'SUBMITTED' %}status--progress{% else %}status--neutral{% endif %}">{{ row.application.get_status_display }}</span></td>
         </tr>{% endfor %}</tbody>
       </table></div>

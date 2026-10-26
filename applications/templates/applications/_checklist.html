@@ -1,14 +1,85 @@
-<p>Список зависит от выбранного продукта и обеспечения. Загрузка ещё не означает, что документ проверен.</p>
-<p>PDF, изображения, таблицы, DOCX: до 20 МБ на файл и 50 МБ на весь пакет.</p>
-{% if form.is_bound and form.has_document_errors %}<p class="review-note" role="alert">Проверка не прошла. Браузер не сохраняет выбранные файлы после отправки — выберите нужные документы повторно.</p>{% endif %}
-<p x-show="!advice.checklist.length">Выберите продукт, чтобы увидеть необходимый комплект.</p>
+<p>Комплект зависит от выбранного продукта. Загрузка ещё не означает, что документ проверен банком.</p>
+<p>PDF, PNG, JPG, XLSX, CSV, DOCX: до 10 МБ на файл, не более 5 файлов и 50 МБ на всю версию с учётом уже приложенных. Формат .xls не поддерживается.</p>
+<p class="muted-copy">При смене продукта документы пунктов, которых нет в новом комплекте, не отправятся. Уже выбранные файлы сохранятся в форме и вернутся, если снова выбрать прежний продукт.</p>
+{% if form.is_bound %}<p class="review-note" role="alert">Форма не отправлена. Браузер не сохраняет выбранные файлы после отправки — выберите документы повторно. Остальные поля сохранены.</p>{% endif %}
+{% if form.remove_document_ids.errors %}<p class="form-error" id="remove-document-ids-error" role="alert" data-error-for="remove_document_ids">{{ form.remove_document_ids.errors|striptags }}</p>{% endif %}
+{% if form.previous_version %}<p class="muted-copy">{{ form.remove_document_ids.help_text }}</p>{% endif %}
+<p x-show="!advice.checklist.length" class="muted-copy">Выберите продукт, чтобы увидеть необходимый комплект.</p>
+<div class="upload-summary" aria-live="polite">
+  <strong x-text="packageSummary()"></strong>
+  <p class="form-error" x-show="packageStats().errors.length" x-text="packageStats().errors[0]"></p>
+</div>
+<div x-cloak class="review-note file-notice" x-show="fileNotice" role="status">
+  <p x-text="fileNotice"></p>
+  <button type="button" class="button button--secondary" @click="fileNotice=''">Понятно</button>
+</div>
 {% for item in form.document_fields %}
-  <div class="form-section" data-document-code="{{ item.code }}" x-show="requires('{{ item.code }}') || hasFiles('{{ item.code }}') || hasServerError('{{ item.code }}')">
-    {% include "core/_field.html" with field=item.field %}
-    <p class="muted-copy">{{ item.field.help_text }}</p>
-    <p x-show="!requires('{{ item.code }}')">Сохранится как дополнительный документ: для текущего продукта не требуется.</p>
-    <p x-text="uploadStatus('{{ item.code }}', {{ item.existing|length }})"></p>
-    {% if item.existing %}<p>Уже приложено: {% for document in item.existing %}{{ document.original_name }}{% if not forloop.last %}, {% endif %}{% endfor %}. Без новой загрузки эти файлы перейдут в следующую версию. Новая загрузка заменит этот пункт.</p>{% endif %}
-  </div>
+  <fieldset x-cloak class="upload-card" data-document-code="{{ item.code }}" x-show="requires('{{ item.code }}') || hasServerError('{{ item.code }}')" x-effect="syncTypedDocumentField('{{ item.code }}')">
+    <legend class="upload-card__title">{{ item.field.label }}</legend>
+    <p class="upload-card__meta" x-show="requires('{{ item.code }}')">Обязательно для выбранного продукта. Можно приложить несколько файлов.</p>
+    <p class="upload-card__meta" id="document-{{ item.code }}-loss" x-show="!requires('{{ item.code }}')">Пункт не относится к выбранному продукту и не будет отправлен. Сохранённые ранее файлы останутся в форме.</p>
+    {% include "core/_field.html" with field=item.field sr_label=1 show_help=1 %}
+    <ul class="file-list" x-show="selectedFiles('{{ item.code }}').length" aria-label="Выбранные файлы для пункта «{{ item.field.label }}»">
+      <template x-for="file in selectedFiles('{{ item.code }}')" :key="file.key">
+        <li>
+          <span class="file-list__name" x-text="file.name"></span>
+          <span class="file-list__meta" x-text="file.size"></span>
+          <button type="button" class="file-list__remove" @click="removeFile('{{ item.code }}', file.index)" :aria-label="`Удалить файл «${file.name}»`">Удалить</button>
+        </li>
+      </template>
+    </ul>
+    <p class="upload-card__status" id="document-{{ item.code }}-status" x-text="uploadStatus('{{ item.code }}', {{ item.existing|length }})"></p>
+    {% if item.existing %}
+      <div class="file-retained" id="document-{{ item.code }}-existing">
+        <p>Уже приложено к предыдущей версии. Пункт будет перенесён в новую версию, если вы не загрузите новые файлы.</p>
+        <ul>
+          {% for document in item.existing %}
+            <li data-retained-file data-document-id="{{ document.id }}" data-name="{{ document.original_name }}" data-size="{{ document.size }}">
+              <a href="{% url 'document-download' document.id %}">{{ document.original_name }}</a>
+              <span>{{ document.size|filesizeformat }}</span>
+              <label class="file-retained__remove">
+                <input type="checkbox" name="remove_document_ids" value="{{ document.id }}" data-document-id="{{ document.id }}" @change="syncTypedDocumentField('{{ item.code }}')">
+                <span>Не переносить в новую версию<span class="sr-only"> — {{ document.original_name }}</span></span>
+              </label>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="upload-card__meta" x-show="selectedFiles('{{ item.code }}').length">Новая загрузка заменит все файлы этого пункта.</p>
+      </div>
+    {% endif %}
+  </fieldset>
 {% endfor %}
-<div class="form-section">{% include "core/_field.html" with field=form.documents %}</div>
+<fieldset class="upload-card upload-card--generic" data-document-generic data-document-label="Дополнительные документы">
+  <legend class="upload-card__title">Дополнительные документы</legend>
+  <p class="upload-card__meta">Необязательно. Например, годовая отчётность: отдельного обязательного требования нет. Новые файлы добавляются к уже приложенным.</p>
+  {% include "core/_field.html" with field=form.documents sr_label=1 show_help=1 %}
+  <ul class="file-list" x-show="selectedFiles('').length" aria-label="Выбранные дополнительные документы">
+    <template x-for="file in selectedFiles('')" :key="file.key">
+      <li>
+        <span class="file-list__name" x-text="file.name"></span>
+        <span class="file-list__meta" x-text="file.size"></span>
+        <button type="button" class="file-list__remove" @click="removeFile('', file.index)" :aria-label="`Удалить файл «${file.name}»`">Удалить</button>
+      </li>
+    </template>
+  </ul>
+  <p class="upload-card__status" id="document-generic-status" x-text="selectedFiles('').length ? 'Файлы выбраны, будут загружены при отправке' : 'Не выбрано'"></p>
+  {% if form.previous_version %}
+    <div class="file-retained" id="document-generic-existing">
+      <p>Годовая отчётность и другие общие файлы из предыдущей версии сохранятся.</p>
+      <ul>
+        {% for document in form.previous_version.documents.all %}
+          {% if not document.requirement_code %}
+            <li data-retained-file data-document-id="{{ document.id }}" data-name="{{ document.original_name }}" data-size="{{ document.size }}">
+              <a href="{% url 'document-download' document.id %}">{{ document.original_name }}</a>
+              <span>{{ document.size|filesizeformat }}</span>
+              <label class="file-retained__remove">
+                <input type="checkbox" name="remove_document_ids" value="{{ document.id }}" data-document-id="{{ document.id }}">
+                <span>Не переносить в новую версию<span class="sr-only"> — {{ document.original_name }}</span></span>
+              </label>
+            </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+</fieldset>

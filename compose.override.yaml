@@ -1,0 +1,19 @@
+# RESTORE-01: internal Docker link AlfaAmeba(Django) <-> document node.
+# No secrets in this file. Loaded automatically by plain `docker compose`.
+services:
+  django:
+    networks:
+      web: {}
+      internal: {}
+      alfa-node-net:
+        aliases:
+          - django-web
+  node-sender:
+    networks:
+      web: {}
+      internal: {}
+      alfa-node-net: {}
+
+networks:
+  alfa-node-net:
+    external: true

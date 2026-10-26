@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from documents.services import save_documents_and_enqueue
-from organizations.models import OrganizationAccessRequest, OrganizationMembership
+from organizations.models import OrganizationMembership
 from organizations.services import organization_for_submission
 from users.models import User
 from users.permissions import can_approve_applications, can_review_applications
@@ -17,10 +17,14 @@ from .models import (
 )
 
 
-def _snapshot(data, *, version_number, submitted_at):
+def _normalized_identity(value):
+    return " ".join((value or "").split()).casefold()
+
+
+def _snapshot(data, *, organization_name, inn, version_number, submitted_at):
     return {
-        "organization_name": data["organization_name"],
-        "inn": data["inn"],
+        "organization_name": organization_name,
+        "inn": inn,
         "product_code": data["product"].code,
         "amount": str(data["amount"]),
         "term_months": data["term_months"],
@@ -34,18 +38,16 @@ def _snapshot(data, *, version_number, submitted_at):
 
 
 @transaction.atomic
-def submit_application(form: ApplicationForm, user) -> Application | OrganizationAccessRequest:
+def submit_application(form: ApplicationForm, user) -> Application:
     data = form.cleaned_data
-    organization, access_request = organization_for_submission(
+    organization, _ = organization_for_submission(
         inn=data["inn"], name=data["organization_name"], user=user
     )
-    if access_request is not None:
-        return access_request
     submitted_at = timezone.now()
     application = Application.objects.create(
         organization=organization,
-        organization_name=organization.name,
-        inn=organization.inn,
+        organization_name=data["organization_name"],
+        inn=data["inn"],
         created_by=user,
         status=Application.Status.SUBMITTED,
         submitted_at=submitted_at,
@@ -58,7 +60,13 @@ def submit_application(form: ApplicationForm, user) -> Application | Organizatio
         term_months=data["term_months"],
         purpose=data["purpose"],
         submitted_at=submitted_at,
-        snapshot=_snapshot(data, version_number=1, submitted_at=submitted_at),
+        snapshot=_snapshot(
+            data,
+            organization_name=data["organization_name"],
+            inn=data["inn"],
+            version_number=1,
+            submitted_at=submitted_at,
+        ),
     )
     save_documents_and_enqueue(version, data["document_uploads"], data["retained_documents"])
     ApplicationEvent.objects.create(
@@ -77,8 +85,18 @@ def submit_revision(application: Application, form: ApplicationForm, user) -> Ap
     application = Application.objects.select_for_update().get(pk=application.pk)
     if application.status != Application.Status.NEEDS_REVISION:
         raise ValidationError("Эта заявка сейчас не ожидает доработки")
-    if form.cleaned_data["inn"] != application.inn:
-        raise ValidationError("ИНН организации нельзя изменить при доработке заявки")
+    data = form.cleaned_data
+    identity_errors = {}
+    if data["inn"] != application.inn:
+        identity_errors["inn"] = "ИНН организации нельзя изменить при доработке заявки"
+    if _normalized_identity(data["organization_name"]) != _normalized_identity(
+        application.organization_name
+    ):
+        identity_errors["organization_name"] = (
+            "Название организации нельзя изменить при доработке заявки"
+        )
+    if identity_errors:
+        raise ValidationError(identity_errors)
 
     membership_exists = OrganizationMembership.objects.filter(
         organization=application.organization,
@@ -96,7 +114,6 @@ def submit_revision(application: Application, form: ApplicationForm, user) -> Ap
     previous_status = application.status
     version_number = application.current_version + 1
     submitted_at = timezone.now()
-    data = form.cleaned_data
     version = ApplicationVersion.objects.create(
         application=application,
         version_number=version_number,
@@ -105,7 +122,13 @@ def submit_revision(application: Application, form: ApplicationForm, user) -> Ap
         term_months=data["term_months"],
         purpose=data["purpose"],
         submitted_at=submitted_at,
-        snapshot=_snapshot(data, version_number=version_number, submitted_at=submitted_at),
+        snapshot=_snapshot(
+            data,
+            organization_name=application.organization_name,
+            inn=application.inn,
+            version_number=version_number,
+            submitted_at=submitted_at,
+        ),
     )
     save_documents_and_enqueue(version, data["document_uploads"], data["retained_documents"])
     application.current_version = version_number

@@ -14,10 +14,31 @@
 
 import math
 
+from .final_analysis import (
+    EXTRACTION_ERROR_MESSAGE as FINAL_ANALYSIS_EXTRACTION_MESSAGE,
+    JOB_FAILED_MESSAGE as FINAL_ANALYSIS_JOB_FAILED_MESSAGE,
+    NO_JOB_MESSAGE as FINAL_ANALYSIS_NO_JOB_MESSAGE,
+    PENDING_MESSAGE as FINAL_ANALYSIS_PENDING_MESSAGE,
+    final_analysis_placeholder,
+    final_analysis_view,
+)
 from .models import NodeJob
 
 SCHEMA_VERSION = 2
 PROCESSING_ERROR_STATUS = "processing_error"
+# Отдельные состояния карточки: отчёт виден даже без финансового результата.
+STATE_NO_JOB = "no_job"
+STATE_PENDING = "pending"
+STATE_FAILED = "failed"
+STATE_PROCESSING_ERROR = "processing_error"
+STATE_UNSUPPORTED = "unsupported"
+STATE_READY = "ready"
+
+# Для processing_error: ML не запускалась, но это не отказ по заявке.
+EXTRACTION_MODEL_MESSAGE = (
+    "Не выполнен: обработка документов завершилась технической ошибкой. "
+    "Это не отказ по заявке."
+)
 
 TONE_POSITIVE = "positive"
 TONE_WARNING = "warning"
@@ -536,12 +557,13 @@ def _model_entry(key, label, kind, value):
     return {"label": label, "display": display}
 
 
-def _model_outputs(raw):
+def _model_outputs(raw, *, fallback_note=""):
     """Строгий белый список статусов вывода модели.
 
     ``completed`` — единственный статус, при котором показываем конечные
     корректные числа. ``failed`` — отдельное сообщение без числовых полей.
     ``not_run``/отсутствующий/неизвестный статус — «ещё не запускалась».
+    ``fallback_note`` добавляет честное объяснение состояния обработки.
     """
     outputs = _dict(raw)
     status = outputs.get("status")
@@ -558,6 +580,7 @@ def _model_outputs(raw):
             "entries": entries,
             "note": _text(outputs.get("note"), 1000),
             "disclaimer": MODEL_NOT_BANK_DECISION_NOTE,
+            "source_label": "ML-модель банка",
         }
     if status == MODEL_STATUS_FAILED:
         return {
@@ -568,6 +591,7 @@ def _model_outputs(raw):
             "entries": [],
             "note": MODEL_FAILED_MESSAGE,
             "disclaimer": MODEL_NOT_BANK_DECISION_NOTE,
+            "source_label": "ML-модель банка",
         }
     return {
         "run": False,
@@ -575,8 +599,9 @@ def _model_outputs(raw):
         "failed": False,
         "risk_grade": "",
         "entries": [],
-        "note": "",
-        "disclaimer": "",
+        "note": fallback_note,
+        "disclaimer": MODEL_NOT_BANK_DECISION_NOTE if fallback_note else "",
+        "source_label": "ML-модель банка",
     }
 
 
@@ -717,23 +742,120 @@ def _chart_data(cash_flow, forecast, concentration):
     return data
 
 
-def financial_view(node_job):
-    """Представление финансового результата узла или ``None``.
+def _empty_state_view(state, *, final_analysis, model_outputs, is_mock=False):
+    """Минимальная безопасная карточка состояния без финансового результата.
 
-    ``None`` — задания нет или callback ещё не пришёл. ``state``:
-    ``processing_error`` — техническая ошибка узла (финансов нет по контракту),
-    ``unsupported`` — результат старой версии или не похож на v2,
-    ``ready`` — можно показывать.
+    Не подставляет нули/решения вместо отсутствующих данных: пустые блоки
+    нужны только чтобы шаблон не зависел от ``financial.state``.
     """
-    if node_job is None or getattr(node_job, "status", None) != NodeJob.Status.COMPLETED:
-        return None
+    return {
+        "state": state,
+        "is_mock": is_mock is True,
+        "summary": "",
+        "analysis_date": "",
+        "model": "",
+        "readiness": {"items": [], "ready_count": 0, "total": len(READINESS_LABELS)},
+        "annual": {"ready": False, "year": "", "missing": [], "rows": []},
+        "cash_flow": {
+            "months": [],
+            "complete_months": 0,
+            "accounts_confirmed": False,
+            "average_inflows": "—",
+            "average_outflows": "—",
+            "average_balance": "—",
+            "latest_balance": None,
+            "latest_balance_display": "—",
+            "latest_balance_date": "",
+        },
+        "statistics": [],
+        "forecast": {
+            "ready": False,
+            "period": "",
+            "data_as_of": "",
+            "scenarios": [],
+            "stress": None,
+            "limitations": [],
+            "backtest": {"folds": 0, "mae": "—", "mape": "—"},
+        },
+        "concentration": [],
+        "warnings": [],
+        "client_requests": [],
+        "required_requests": 0,
+        "feedback_draft": "",
+        "employee_recommendations": [],
+        "model_outputs": model_outputs,
+        "document_fields": [],
+        "issues": [],
+        "files": [],
+        "highlights": [],
+        "processing": {
+            "files_received": None,
+            "accepted_observations": None,
+            "documents_checked": None,
+        },
+        "final_analysis": final_analysis,
+        "chart_data": {"cashflow": None, "forecast": None, "concentration": None},
+    }
+
+
+def _mock_flag(inner):
+    """Демо-флаг из любого доступного блока; ``True`` нельзя погасить."""
+    analysis = _dict(inner.get("financial_analysis"))
+    final = _dict(inner.get("final_analysis"))
+    return analysis.get("is_mock") is True or final.get("is_mock") is True
+
+
+def financial_view(node_job):
+    """Представление финансового результата узла; отчёт доступен в любом состоянии.
+
+    ``state``: ``no_job`` — задания нет; ``pending`` — обработка ещё идёт;
+    ``failed`` — задание не завершилось; ``processing_error`` — техническая
+    ошибка узла; ``unsupported`` — результат старой версии; ``ready`` — можно
+    показывать финансовые расчёты. ``final_analysis`` и ``model_outputs``
+    возвращаются всегда, чтобы блоки отчёта не исчезали вместе с финансами.
+    """
+    if node_job is None:
+        return _empty_state_view(
+            STATE_NO_JOB,
+            final_analysis=final_analysis_placeholder(FINAL_ANALYSIS_NO_JOB_MESSAGE),
+            model_outputs=_model_outputs(None),
+        )
+
+    status = getattr(node_job, "status", None)
+    if status != NodeJob.Status.COMPLETED:
+        if status == NodeJob.Status.FAILED:
+            return _empty_state_view(
+                STATE_FAILED,
+                final_analysis=final_analysis_placeholder(FINAL_ANALYSIS_JOB_FAILED_MESSAGE),
+                model_outputs=_model_outputs(None),
+            )
+        return _empty_state_view(
+            STATE_PENDING,
+            final_analysis=final_analysis_placeholder(FINAL_ANALYSIS_PENDING_MESSAGE),
+            model_outputs=_model_outputs(None),
+        )
+
     payload = _dict(getattr(node_job, "result", None))
     inner = _dict(payload.get("result"))
+    is_mock = _mock_flag(inner)
     if inner.get("status") == PROCESSING_ERROR_STATUS:
-        return {"state": "processing_error"}
+        return _empty_state_view(
+            STATE_PROCESSING_ERROR,
+            final_analysis=final_analysis_placeholder(
+                FINAL_ANALYSIS_EXTRACTION_MESSAGE, is_mock
+            ),
+            model_outputs=_model_outputs(None, fallback_note=EXTRACTION_MODEL_MESSAGE),
+            is_mock=is_mock,
+        )
+
     analysis = _dict(inner.get("financial_analysis"))
     if analysis.get("schema_version") != SCHEMA_VERSION:
-        return {"state": "unsupported"}
+        return _empty_state_view(
+            STATE_UNSUPPORTED,
+            final_analysis=final_analysis_view(inner),
+            model_outputs=_model_outputs(analysis.get("model_outputs")),
+            is_mock=is_mock,
+        )
 
     cash_flow = _cash_flow(analysis.get("cash_flow"))
     annual = _annual(analysis.get("annual_model_input"))
@@ -741,9 +863,12 @@ def financial_view(node_job):
     concentration = _concentration(cash_flow["months"])
     client_requests = _client_requests(analysis.get("client_requests"))
     processing = _dict(inner.get("processing"))
+    final_analysis = final_analysis_view(inner)
+    # Демо-флаг нельзя погасить: true из любого блока остаётся true.
+    is_mock = is_mock or final_analysis["is_mock"] is True
     return {
-        "state": "ready",
-        "is_mock": analysis.get("is_mock") is True,
+        "state": STATE_READY,
+        "is_mock": is_mock,
         "summary": _text(inner.get("summary"), 1000),
         "analysis_date": date_label(_dict(analysis.get("application")).get("analysis_date")),
         "model": _text(payload.get("model"), 120),
@@ -772,5 +897,6 @@ def financial_view(node_job):
             "accepted_observations": processing.get("accepted_observations") if isinstance(processing.get("accepted_observations"), int) else None,
             "documents_checked": inner.get("documents_checked") if isinstance(inner.get("documents_checked"), int) else None,
         },
+        "final_analysis": final_analysis,
         "chart_data": _chart_data(cash_flow, forecast, concentration),
     }

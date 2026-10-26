@@ -454,7 +454,8 @@ def build_application_context(version, *, inputs=None, provider_reports=(), anal
 
     Ничего не додумывает: ``collateral`` — только строгий bool из снимка иначе
     ``None``; список требований берётся из снимка, а при его отсутствии — из
-    правил продукта. Название, цель кредита и сырой снимок не передаются.
+    правил продукта. Название организации и сырой снимок не передаются; цель
+    кредита — только явное ``version.purpose`` (не из снимка), до 1000 символов.
 
     Поверх прежних полей — поля контракта v2 (docs/financial-api-v2.md): без ИНН
     узел не отсечёт значения другого лица, без суммы и срока не посчитает платёж,
@@ -464,6 +465,7 @@ def build_application_context(version, *, inputs=None, provider_reports=(), anal
     snapshot = _snapshot_mapping(version)
     product_code = _resolve_product_code(version, snapshot)
     collateral = _resolve_collateral(snapshot)
+    purpose = _clean_text(getattr(version, "purpose", None), 1000)
 
     checklist = _sanitize_checklist(snapshot.get("checklist"))
     if checklist:
@@ -487,6 +489,8 @@ def build_application_context(version, *, inputs=None, provider_reports=(), anal
         "document_version": int(version.version_number),
         "has_collateral": collateral,
     }
+    if purpose is not None:
+        context["purpose"] = purpose
     loan_type = _resolve_loan_type(product_code)
     borrower_inn = _resolve_borrower_inn(snapshot, version)
     loan_amount = _resolve_loan_amount(version, snapshot)

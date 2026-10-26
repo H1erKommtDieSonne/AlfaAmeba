@@ -451,6 +451,58 @@ class NodeFinancialSummaryViewTests(CreditTestCase):
         self.assertNotContains(response, "Финансовый разбор документов")
 
 
+    def test_processing_error_card_keeps_both_report_sections(self):
+        self._set_node(
+            {
+                "result": {
+                    "schema_version": 2,
+                    "status": "processing_error",
+                    "summary": "RAW-PE",
+                    "financial_analysis": None,
+                }
+            }
+        )
+        response = self._bank()
+        self.assertContains(response, "Анализ финмодели")
+        self.assertContains(response, "Расчёт ML-моделей")
+        self.assertContains(
+            response,
+            "Итоговый анализ не запускался: не удалось обработать документы.",
+        )
+        self.assertContains(
+            response,
+            "Не выполнен: обработка документов завершилась технической ошибкой. "
+            "Это не отказ по заявке.",
+        )
+        self.assertNotContains(response, "RAW-PE")
+
+    def test_ready_card_shows_ml_and_neural_sections(self):
+        payload = _inner(
+            _financial(
+                model_outputs={
+                    "status": "completed",
+                    "risk_grade": "B",
+                    "safe_credit_limit_rub_thousands": 1500,
+                    "approval_probability_percent": 35,
+                }
+            )
+        )
+        payload["result"]["final_analysis"] = {
+            "schema_version": 1,
+            "status": "completed",
+            "is_mock": False,
+            "summary": "Итоговый текст нейросети.",
+            "not_a_decision": True,
+        }
+        self._set_node(payload)
+        response = self._bank()
+        self.assertContains(response, "Анализ финмодели")
+        self.assertContains(response, "Итоговый текст нейросети.")
+        self.assertContains(response, "Расчёт ML-моделей")
+        self.assertContains(response, "Безопасный лимит")
+        html = response.content.decode("utf-8").replace("\u00a0", " ")
+        self.assertIn("35 %", html)
+
     def test_v2_without_financial_still_suppresses_raw_json(self):
         self._set_node(
             {

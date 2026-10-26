@@ -6,7 +6,7 @@
 """
 
 SECTIONS = {
-    "business": {"business-cabinet", "application-success", "organization-access-status"},
+    "business": {"business-cabinet", "application-success"},
     "business-applications": {"business-applications", "business-application-detail"},
     "bank": {"bank-queue", "bank-application-detail"},
     "bank-admin": {"bank-admin-dashboard"},

@@ -1,6 +1,6 @@
 """Versioned demo rules; not bank eligibility or approval rules."""
 
-RULES_VERSION = "needs-1"
+RULES_VERSION = "needs-2"
 NEEDS = [
     ("working", "Закупить товар / текущие расходы"),
     ("gap", "Закрыть кассовый разрыв"),
@@ -10,11 +10,32 @@ NEEDS = [
     ("debt", "Снизить нагрузку по долгам"),
 ]
 DOCUMENTS = {
-    "statement": ("Выписка по расчётному счёту", "Подтвердить обороты и поступления. Период уточняет сотрудник."),
-    "estimate": ("Смета или предложение поставщика", "Подтвердить состав и стоимость проекта или оборудования."),
-    "contract": ("Контракт и приложения", "Подтвердить предмет сделки, сроки исполнения и оплаты."),
-    "debt": ("Кредитные договоры, графики и остатки", "Сопоставить действующие обязательства и платежи."),
-    "collateral": ("Документы на обеспечение", "Подтвердить право собственности на предлагаемый залог."),
+    "statement": (
+        "Выписка по расчётному счёту",
+        "Выписка за согласованный с сотрудником период; для предварительного "
+        "анализа обычно нужны обороты и поступления за несколько месяцев. "
+        "Подойдёт выписка из интернет-банка.",
+    ),
+    "estimate": (
+        "Смета или предложение поставщика",
+        "Смета или коммерческое предложение с составом, стоимостью и сроками. "
+        "Для оборудования укажите модель, количество и поставщика.",
+    ),
+    "contract": (
+        "Контракт и приложения",
+        "Контракт с предметом, суммой, сроками и порядком оплаты. Приложения, "
+        "спецификации и графики обязательны, если они являются частью сделки.",
+    ),
+    "debt": (
+        "Кредитные договоры, графики и остатки",
+        "Действующие кредитные договоры, графики платежей и справки об остатках "
+        "по всем обязательствам, которые планируется пересмотреть.",
+    ),
+    "collateral": (
+        "Документы на обеспечение",
+        "Право собственности, оценка или инвентаризация, сведения об обременениях. "
+        "Для оборудования и недвижимости подтвердите владельца и характеристики.",
+    ),
 }
 PRODUCT_DOCUMENTS = {
     "working-capital": ["statement"],
@@ -22,6 +43,15 @@ PRODUCT_DOCUMENTS = {
     "investment": ["statement", "estimate"],
     "refinancing": ["statement", "debt"],
 }
+REFERENCE_ONLY_LIMITATION = (
+    "В демо-каталоге нет подключённого продукта для этого варианта: "
+    "это справочная информация, подача недоступна."
+)
+CONSULTATION_MESSAGE = (
+    "Автоматический демо-подбор не нашёл доступного продукта. Это не отказ "
+    "и не решение банка: обсудите задачу с сотрудником банка."
+)
+DEMO_DISCLAIMER = "Это не одобрение кредита и не решение банка."
 
 
 def requirements(product_code, collateral=False):
@@ -61,18 +91,32 @@ def recommend(data, products):
             message = "Задолженность поставщикам или просрочка требует отдельного разбора с сотрудником. Рефинансирование автоматически не предлагается."
         else:
             message = "Уточните, какие обязательства вы хотите погасить."
-    catalog = {p.code: p for p in products}
+
+    catalog = {p.code: p for p in products if p.active}
     result = []
     for code, name, reason in candidates:
         product = catalog.get(code)
-        available = bool(product and product.active and code in PRODUCT_DOCUMENTS)
-        limitation = ""
-        if product and data.get("amount") is not None and not product.min_amount <= data["amount"] <= product.max_amount:
-            available, limitation = False, "Сумма вне диапазона продукта."
-        if product and data.get("term_months") is not None and not product.min_term_months <= data["term_months"] <= product.max_term_months:
-            available, limitation = False, "Срок вне диапазона продукта."
+        implemented = code in PRODUCT_DOCUMENTS
+        limitations = []
+        if product is None or not implemented:
+            available = False
+            limitation = REFERENCE_ONLY_LIMITATION
+        else:
+            if data.get("amount") is not None and not product.min_amount <= data["amount"] <= product.max_amount:
+                limitations.append("Сумма вне демо-диапазона продукта.")
+            if data.get("term_months") is not None and not product.min_term_months <= data["term_months"] <= product.max_term_months:
+                limitations.append("Срок вне демо-диапазона продукта.")
+            available = not limitations
+            limitation = " ".join(limitations)
         conditions = (f"Демо-диапазон: {product.min_amount:,.0f}–{product.max_amount:,.0f} ₽, "
                       f"{product.min_term_months}–{product.max_term_months} мес. Индивидуальные условия определяет банк.") if product else ""
         result.append({"code": code, "name": name, "reason": reason, "available": available, "conditions": conditions,
-                       "limitation": limitation or ("" if available else "Пока только справочная рекомендация; подача недоступна.")})
-    return {"rules_version": RULES_VERSION, "items": result, "message": message if not result else "Предварительный подбор по вашей задаче. Это не одобрение кредита."}
+                       "limitation": limitation})
+
+    if result and any(item["available"] for item in result):
+        message = f"Предварительный подбор по вашей задаче. {DEMO_DISCLAIMER}"
+    elif result:
+        message = CONSULTATION_MESSAGE
+    else:
+        message = f"{message} {CONSULTATION_MESSAGE}"
+    return {"rules_version": RULES_VERSION, "items": result, "message": message}

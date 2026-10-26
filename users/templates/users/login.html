@@ -21,14 +21,13 @@
       <p class="auth-card__lead">Используйте email, указанный при регистрации.</p>
       <form method="post" class="form-stack" @submit="submitting = true">
         {% csrf_token %}
-        {% if form.non_field_errors %}<div class="error-box">Email или пароль указаны неверно.</div>{% endif %}
+        {% if form.non_field_errors %}<div class="error-box" role="alert">Email или пароль указаны неверно.</div>{% endif %}
         {% include "core/_field.html" with field=form.username %}
         {% include "core/_field.html" with field=form.password %}
         {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
         <button type="submit" :disabled="submitting" class="button button--primary button--wide"><span x-show="!submitting">Продолжить</span><span x-cloak x-show="submitting">Входим…</span></button>
       </form>
       <p class="auth-switch">Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a></p>
-      <p class="auth-note">Демо-доступы для команды находятся в README проекта.</p>
     </div>
   </section>
 </main>

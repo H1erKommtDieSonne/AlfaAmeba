@@ -4,16 +4,33 @@
     {% if financial.is_mock %}<span class="status status--warning">Демо-данные</span>{% endif %}
   </div>
   <div class="panel__body">
-    {% if financial.state == 'ready' %}
-      {% if financial.highlights %}
-        <h3 class="side-heading side-heading--first">Ключевые выводы</h3>
-        <ul class="signal-list">
-          {% for item in financial.highlights %}
-            <li class="signal signal--{{ item.tone }}"><span class="signal__icon" aria-hidden="true"></span><p>{{ item.message }}</p></li>
-          {% endfor %}
-        </ul>
-      {% endif %}
+    {% if financial.is_mock %}
+      <p class="muted-copy">Демонстрационные данные: часть результата сформирована демо-сценарием, а не реальным расчётом.</p>
+    {% endif %}
 
+    {% if financial.state == 'processing_error' %}
+      <div class="review-note">Узел сообщил о технической ошибке обработки. Это не замечание к документам клиента; финансовый анализ недоступен.</div>
+    {% elif financial.state == 'unsupported' %}
+      <p class="muted-copy">Ответ узла в старом формате без финансового анализа. Исходный ответ — в технических деталях внизу.</p>
+    {% elif financial.state != 'ready' %}
+      <div class="empty-state empty-state--compact">
+        <h2>Анализа пока нет</h2>
+        <p>Сейчас: {% include "applications/bank/_node_state.html" %}. Страница не обновляется сама — откройте её позже.</p>
+      </div>
+    {% endif %}
+
+    {% if financial.state == 'ready' and financial.highlights %}
+      <h3 class="side-heading side-heading--first">Ключевые выводы</h3>
+      <ul class="signal-list">
+        {% for item in financial.highlights %}
+          <li class="signal signal--{{ item.tone }}"><span class="signal__icon" aria-hidden="true"></span><p>{{ item.message }}</p></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% include "applications/bank/_final_analysis.html" %}
+
+    {% if financial.state == 'ready' %}
       <h3 class="side-heading">Проблемные сигналы <span class="side-heading__count">{{ financial.warnings|length }}</span></h3>
       {% if financial.warnings %}
         <ul class="signal-list">
@@ -57,35 +74,16 @@
           </tbody>
         </table>
       {% endif %}
+    {% endif %}
 
-      <h3 class="side-heading">Вывод финмодели</h3>
-      {% if financial.model_outputs.run %}
-        <dl class="fact-list">
-          {% if financial.model_outputs.risk_grade %}<div><dt>Риск-грейд</dt><dd>{{ financial.model_outputs.risk_grade }}</dd></div>{% endif %}
-          {% for entry in financial.model_outputs.entries %}<div><dt>{{ entry.label }}</dt><dd>{{ entry.display }}</dd></div>{% endfor %}
-        </dl>
-        {% if financial.model_outputs.note %}<p class="muted-copy">{{ financial.model_outputs.note }}</p>{% endif %}
-        {% if financial.model_outputs.disclaimer %}<p class="muted-copy">{{ financial.model_outputs.disclaimer }}</p>{% endif %}
-      {% elif financial.model_outputs.failed %}
-        <div class="review-note">{{ financial.model_outputs.note }}</div>
-      {% else %}
-        <p class="muted-copy">ML-модель ещё не запускалась. Риск-грейд, вероятности и безопасный лимит появятся после её расчёта по годовым показателям{% if not financial.readiness.items.0.ready %} — для этого сначала нужны все годовые входы{% endif %}.</p>
-      {% endif %}
+    {% include "applications/bank/_model_outputs.html" %}
 
+    {% if financial.state == 'ready' %}
       {% if financial.employee_recommendations %}
         <h3 class="side-heading">Что проверить сотруднику</h3>
         <ul class="check-list">{% for message in financial.employee_recommendations %}<li>{{ message }}</li>{% endfor %}</ul>
       {% endif %}
       {% if can_confirm_inputs %}<a href="#node-inputs" class="recommendation-link">{% if financial_inputs %}Изменить данные для расчёта →{% else %}Подтвердить счета, выписки и платёж →{% endif %}</a>{% endif %}
-    {% elif financial.state == 'processing_error' %}
-      <div class="review-note">Узел сообщил о технической ошибке обработки. Это не замечание к документам клиента; финансовый анализ недоступен.</div>
-    {% elif financial.state == 'unsupported' %}
-      <p class="muted-copy">Ответ узла в старом формате без финансового анализа. Исходный ответ — в технических деталях внизу.</p>
-    {% else %}
-      <div class="empty-state empty-state--compact">
-        <h2>Анализа пока нет</h2>
-        <p>Сейчас: {% include "applications/bank/_node_state.html" %}. Страница не обновляется сама — откройте её позже.</p>
-      </div>
     {% endif %}
   </div>
 </section>

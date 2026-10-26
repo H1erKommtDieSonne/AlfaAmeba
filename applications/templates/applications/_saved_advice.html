@@ -1,32 +1,42 @@
-{% if version.snapshot.recommendation %}
+﻿{% if version.snapshot %}
 <section class="panel panel--snapshot">
   <div class="panel__header">
-    <div><h2>Подбор на момент отправки</h2><p>Исторический снимок версии №{{ version.version_number }}</p></div>
+    <div><h2>Подбор и комплект на момент отправки</h2><p>Исторический снимок версии {{ version.version_number }}. Текущие условия могут отличаться.</p></div>
     <span class="status status--neutral">Снимок</span>
   </div>
   <div class="panel__body">
-    <p class="review-note">Сохранённый предварительный подбор. Это не текущие условия и не решение банка.</p>
-    <p>{{ version.snapshot.recommendation.message }}</p>
-    <div class="stack advice-list">
-      {% for item in version.snapshot.recommendation.items %}
-        <article class="advice-card{% if 'available' in item and not item.available %} advice-card--unavailable{% endif %}">
-          <div class="title-line">
-            <strong>{{ item.name }}</strong>
-            {% if 'available' in item %}
-              <span class="status {% if item.available %}status--positive{% else %}status--neutral{% endif %}">{% if item.available %}Было доступно{% else %}Подача была недоступна{% endif %}</span>
-            {% else %}
-              <span class="status status--neutral">Доступность не зафиксирована</span>
-            {% endif %}
-          </div>
-          <p>{{ item.reason }}</p>
-          {% if item.conditions %}<p class="muted-copy">Условия на момент отправки: {{ item.conditions }}</p>{% endif %}
-          {% if item.limitation %}<p class="form-error">{{ item.limitation }}</p>{% endif %}
-        </article>
-      {% endfor %}
-    </div>
-    <h3 class="form-section">Комплект на момент отправки</h3>
-    <ul>{% for item in version.snapshot.checklist %}<li>{{ item.name }} — {% if item.status == 'uploaded' %}загружено, ожидает проверки{% else %}не загружено{% endif %}</li>{% endfor %}</ul>
-    <p class="muted-copy">Демонстрационные правила {{ version.snapshot.recommendation.rules_version }}. Состав пакета сохранён на момент отправки версии №{{ version.version_number }}.</p>
+    <p class="review-note">Сохранённый предварительный подбор. Это не одобрение кредита и не решение банка.</p>
+    {% if version.snapshot.recommendation %}
+      <p>{{ version.snapshot.recommendation.message }}</p>
+      <div class="stack advice-list">
+        {% for item in version.snapshot.recommendation.items %}
+          <article class="advice-card{% if 'available' in item and not item.available %} advice-card--unavailable{% endif %}">
+            <div class="title-line">
+              <strong>{{ item.name }}</strong>
+              {% if 'available' in item %}
+                <span class="status {% if item.available %}status--positive{% else %}status--neutral{% endif %}">{% if item.available %}Было доступно{% else %}Подача была недоступна{% endif %}</span>
+              {% else %}
+                <span class="status status--neutral">Доступность не зафиксирована</span>
+              {% endif %}
+            </div>
+            <p>{{ item.reason }}</p>
+            {% if item.conditions %}<p class="muted-copy">Условия на момент отправки: {{ item.conditions }}</p>{% endif %}
+            {% if item.limitation %}<p class="form-error">{{ item.limitation }}</p>{% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted-copy">Предварительный подбор в этой версии не сохранён.</p>
+    {% endif %}
+    {% if version.snapshot.checklist %}
+      <h3 class="form-section">Комплект документов</h3>
+      <ul class="snapshot-checklist">
+        {% for item in version.snapshot.checklist %}
+          <li><span>{{ item.name }}</span><strong>{% if item.status == 'uploaded' %}загружено, ожидает проверки{% else %}не загружено{% endif %}</strong></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if version.snapshot.recommendation.rules_version %}<p class="muted-copy">Демонстрационные правила {{ version.snapshot.recommendation.rules_version }}. Состав пакета сохранён на момент отправки версии {{ version.version_number }}.</p>{% endif %}
   </div>
 </section>
 {% endif %}

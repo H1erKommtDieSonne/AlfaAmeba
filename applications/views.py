@@ -21,7 +21,7 @@ from node_integration.presentation import node_financial_summary, node_review
 from node_integration.services import NodeJobBusy, request_recalculation
 from node_integration.services import latest_completed_job as latest_completed_node_job
 from node_integration.services import latest_job as latest_node_job
-from organizations.models import OrganizationAccessRequest
+from organizations.models import OrganizationMembership
 from products.models import Product
 from products.advisor import NEEDS, recommend, requirements
 from .advisor_forms import NeedsForm
@@ -33,7 +33,7 @@ from users.permissions import (
 )
 
 from .forms import ApplicationForm, CommentForm, ReviewActionForm
-from .models import Application, ApplicationComment
+from .models import Application, ApplicationComment, ApplicationEvent
 from .permissions import can_access_business_application, can_edit_business_application
 from .services import (
     add_comment,
@@ -91,6 +91,24 @@ COMPONENT_STATUS_DISPLAY = {
         "UNKNOWN": ("Нет данных", "status--neutral"),
     },
 }
+SUBMITTABLE_MEMBERSHIP_ROLES = (
+    OrganizationMembership.Role.OWNER,
+    OrganizationMembership.Role.EDITOR,
+    OrganizationMembership.Role.SUBMITTER,
+)
+
+
+def _add_form_errors(form, error):
+    """Перенести ошибку сервиса в форму, сохраняя привязку к полю, если она известна."""
+    message_dict = getattr(error, "message_dict", None)
+    if message_dict:
+        for field, messages in message_dict.items():
+            target = field if field in form.fields else None
+            for message in messages:
+                form.add_error(target, message)
+        return
+    for message in getattr(error, "messages", None) or [str(error)]:
+        form.add_error(None, message)
 
 
 def _analysis_components(result):
@@ -307,7 +325,14 @@ def financing_advice(request):
             return JsonResponse({"error": "Укажите корректную сумму и срок."}, status=400)
     products = list(Product.objects.filter(active=True))
     result = recommend(data, products)
-    selected = next((p for p in products if p.code == request.GET.get("product")), None)
+    selected = next(
+        (
+            p
+            for p in products
+            if p.code == request.GET.get("product") and p.active
+        ),
+        None,
+    )
     result["checklist"] = requirements(selected.code, data.get("collateral", False)) if selected else []
     result["selection_matches"] = bool(selected and any(item["code"] == selected.code and item["available"] for item in result["items"]))
     return JsonResponse(result)
@@ -322,23 +347,22 @@ def business_cabinet(request):
         if form.is_valid():
             try:
                 result = submit_application(form, request.user)
+            except PermissionDenied as error:
+                form.add_error(None, str(error))
             except ValidationError as error:
-                form.add_error(None, error.message)
+                _add_form_errors(form, error)
             else:
-                if isinstance(result, OrganizationAccessRequest):
-                    messages.success(
-                        request,
-                        "Запрос на подтверждение полномочий отправлен администратору банка",
-                    )
-                    return redirect("organization-access-status")
-                application = result
                 messages.success(request, "Заявка отправлена и появилась в очереди банка")
-                return redirect("application-success", application_id=application.id)
+                return redirect("application-success", application_id=result.id)
     else:
         initial_product = Product.objects.filter(code="working-capital", active=True).first()
         membership = (
-            request.user.organization_memberships.filter(is_active=True)
+            request.user.organization_memberships.filter(
+                is_active=True,
+                role__in=SUBMITTABLE_MEMBERSHIP_ROLES,
+            )
             .select_related("organization")
+            .order_by("organization__name", "organization_id")
             .first()
         )
         form = ApplicationForm(
@@ -422,8 +446,10 @@ def business_application_detail(request, application_id):
         if revision_form.is_valid():
             try:
                 submit_revision(application, revision_form, request.user)
+            except PermissionDenied as error:
+                revision_form.add_error(None, str(error))
             except ValidationError as error:
-                revision_form.add_error(None, error.message)
+                _add_form_errors(revision_form, error)
             else:
                 messages.success(request, "Новая версия заявки отправлена в банк")
                 return redirect("business-application-detail", application_id=application.pk)
@@ -437,6 +463,15 @@ def business_application_detail(request, application_id):
             "version": version,
             "revision_form": revision_form,
             "can_edit": can_edit,
+            "revision_request": (
+                application.events.filter(
+                    event_type=ApplicationEvent.Type.STATUS_CHANGED,
+                    to_status=Application.Status.NEEDS_REVISION,
+                    metadata__action=ReviewActionForm.ACTION_REQUEST_REVISION,
+                ).order_by("-created_at", "-pk").first()
+                if application.status == Application.Status.NEEDS_REVISION
+                else None
+            ),
             "client_comments": application.comments.filter(
                 audience=ApplicationComment.Audience.CLIENT
             ),
