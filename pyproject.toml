@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alfa-credit-scoring"
+version = "0.1.0"
+description = "Smart business credit cabinet"
+requires-python = ">=3.12"
+dependencies = [
+  "Django>=5.2,<5.3",
+  "django-environ>=0.12,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pypdf>=5,<7", "openpyxl>=3.1,<4", "defusedxml>=0.7,<1", "jsonschema>=4.23,<5"]
+analysis = ["pypdf>=5,<7", "openpyxl>=3.1,<4", "defusedxml>=0.7,<1"]
+postgres = ["psycopg[binary]>=3.2,<4"]
+docker = [
+  "gunicorn>=23,<24",
+  "psycopg[binary]>=3.2,<4",
+]
+
+[tool.setuptools]
+py-modules = []
+

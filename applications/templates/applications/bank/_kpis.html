@@ -1,0 +1,44 @@
+{% with ready=financial.state %}
+<dl class="kpi-strip">
+  <div class="kpi">
+    <dt>Запрошено</dt>
+    <dd>{{ version.amount|floatformat:"0g" }}&nbsp;₽</dd>
+    <small>{{ version.product.name }} · {{ version.term_months }} мес.</small>
+  </div>
+  <div class="kpi">
+    <dt>Остаток на счёте</dt>
+    {% if ready == 'ready' and financial.cash_flow.latest_balance is not None %}
+      <dd>{{ financial.cash_flow.latest_balance_display }}</dd>
+      <small>на {{ financial.cash_flow.latest_balance_date }} по выписке</small>
+    {% else %}
+      <dd class="kpi__empty">—</dd><small>нет подтверждённой выписки</small>
+    {% endif %}
+  </div>
+  <div class="kpi">
+    <dt>Риск-грейд</dt>
+    {% if financial.model_outputs.risk_grade %}
+      <dd>{{ financial.model_outputs.risk_grade }}</dd><small>по ML-модели</small>
+    {% else %}
+      <dd class="kpi__empty">—</dd><small>ML-модель ещё не запускалась</small>
+    {% endif %}
+  </div>
+  <div class="kpi">
+    <dt>Готовность анализов</dt>
+    {% if ready == 'ready' %}
+      <dd>{{ financial.readiness.ready_count }} <small>из {{ financial.readiness.total }}</small></dd>
+      <small>по данным узла</small>
+    {% else %}
+      <dd class="kpi__empty">—</dd><small>{% include "applications/bank/_node_state.html" %}</small>
+    {% endif %}
+  </div>
+  <div class="kpi">
+    <dt>Запросы клиенту</dt>
+    {% if ready == 'ready' %}
+      <dd>{{ financial.required_requests }} <small>обязательн.</small></dd>
+      <small>всего {{ financial.client_requests|length }}</small>
+    {% else %}
+      <dd class="kpi__empty">—</dd><small>появятся после анализа</small>
+    {% endif %}
+  </div>
+</dl>
+{% endwith %}

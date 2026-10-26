@@ -1,0 +1,13 @@
+.git
+.env
+.venv
+__pycache__
+*.py[cod]
+*.db
+*.egg-info
+staticfiles
+media
+models
+tailwindcss.exe
+tailwindcss
+core/static/core/css/app.css

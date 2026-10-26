@@ -1,0 +1,25 @@
+{% extends "core/base.html" %}
+{% block title %}Доступы · Деловой кабинет{% endblock %}
+{% block content %}
+<main class="workspace">
+  <aside class="sidebar">
+    <p class="sidebar__scope"><strong>Администрирование</strong>Служебный раздел банка</p>
+    <p class="sidebar__group">Разделы</p>
+    <nav class="sidebar__nav" aria-label="Разделы управления">
+      <a href="{% url 'bank-admin-dashboard' %}" class="is-active">Пользователи</a>
+      <a href="{% url 'bank-queue' %}">Кредитные заявки</a>
+    </nav>
+    <p class="sidebar__group">Система</p>
+    <nav class="sidebar__nav"><a href="/admin/">Django Admin</a></nav>
+  </aside>
+
+  <section class="workspace-main">
+    <header class="page-header"><div><p class="breadcrumb">Банк / Администрирование</p><h1>Управление доступом</h1><p>Пользователи системы и кредитные заявки</p></div></header>
+    <dl class="stats-strip">
+      <div class="stat"><dt>Всего пользователей</dt><dd>{{ total_users }}</dd></div>
+      <div class="stat"><dt>Представители бизнеса</dt><dd>{{ business_users }}</dd></div>
+      <div class="stat"><dt>Сотрудники банка</dt><dd>{{ bank_users }}</dd></div>
+    </dl>
+  </section>
+</main>
+{% endblock %}

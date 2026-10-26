@@ -1,0 +1,29 @@
+.env
+.venv/
+.venv-cpython/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.db
+*.egg-info/
+.taste-skill/
+staticfiles/
+media/
+models/*
+!models/.gitkeep
+
+# Tailwind: бинарник у каждого свой, под свою ОС (см. README), а CSS собирается из theme/input.css
+/tailwindcss.exe
+/tailwindcss
+/core/static/core/css/app.css
+
+# Архив с секретами, приложенный вручную; не коммитим
+ollama-docs.zip
+
+# Локальные артефакты запуска dev-сервера и зависимости (не коммитим)
+/.django-server.stderr.log
+/.django-server.stdout.log
+/.tailwind-watch.stderr.log
+/.tailwind-watch.stdout.log
+/.npm-cache/
+/node_modules/

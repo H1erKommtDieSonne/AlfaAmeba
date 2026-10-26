@@ -1,0 +1,35 @@
+{% extends "core/base.html" %}
+{% block title %}Регистрация · Деловой кабинет{% endblock %}
+{% block content %}
+<main class="public-shell public-shell--register">
+  <section class="public-story">
+    <div class="public-story__inner">
+      <p class="eyebrow">Кабинет компании</p>
+      <h1>Все заявки бизнеса — в одном месте.</h1>
+      <p class="public-story__lead">Создайте личный аккаунт. Заполните сведения о бизнесе и подайте заявку — статус и уточнения будут в кабинете.</p>
+      <ol class="public-steps" aria-label="Этапы начала работы">
+        <li><span>01</span><p><strong>Создайте аккаунт</strong><small>Понадобятся имя, email и пароль</small></p></li>
+        <li><span>02</span><p><strong>Заполните сведения о бизнесе</strong><small>Данные компании и документы для заявки</small></p></li>
+        <li><span>03</span><p><strong>Подайте заявку</strong><small>Статус и уточнения — в кабинете</small></p></li>
+      </ol>
+    </div>
+  </section>
+  <section class="auth-side">
+    <div class="auth-card auth-card--wide" x-data="{ submitting: false }">
+      <p class="eyebrow">Новый клиент</p>
+      <h2>Создать аккаунт</h2>
+      <p class="auth-card__lead">Для владельца или уполномоченного представителя бизнеса.</p>
+      <form method="post" class="form-stack" @submit="submitting = true">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="error-box" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid">{% include "core/_field.html" with field=form.first_name %}{% include "core/_field.html" with field=form.last_name %}</div>
+        {% include "core/_field.html" with field=form.email %}
+        <div class="form-grid form-grid--passwords">{% include "core/_field.html" with field=form.password1 %}{% include "core/_field.html" with field=form.password2 %}</div>
+        <p class="form-help">Не менее 8 символов. Не используйте простой или полностью цифровой пароль.</p>
+        <button type="submit" :disabled="submitting" class="button button--primary button--wide"><span x-show="!submitting">Создать аккаунт</span><span x-cloak x-show="submitting">Создаём…</span></button>
+      </form>
+      <p class="auth-switch">Уже зарегистрированы? <a href="{% url 'login' %}">Войти</a></p>
+    </div>
+  </section>
+</main>
+{% endblock %}

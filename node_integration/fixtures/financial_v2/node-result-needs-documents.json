@@ -1,0 +1,616 @@
+{
+  "status": "completed",
+  "verification_status": "needs_review",
+  "model": "qwen3.5:35b-a3b",
+  "files": [
+    {
+      "filename": "bank.csv",
+      "method": "structured_csv",
+      "truncated": false,
+      "uncertain_fragments": [],
+      "verified": false,
+      "status": "checked",
+      "sha256": "4b3143a2b4d01e1c52eee24993dd04eaa43b32339b5737ff2d35581889ad055a",
+      "categories": [
+        "bank_statement"
+      ]
+    }
+  ],
+  "result": {
+    "schema_version": 2,
+    "status": "needs_documents",
+    "summary": "Данные подготовлены. Проверьте готовность каждого вида анализа и запросы дополнительной информации.",
+    "issues": [
+      {
+        "code": "missing_field",
+        "message": "Оценка обеспечения. Не получены данные: collateral_value",
+        "suggestion": "Предоставьте оценочный отчёт с датой и стоимостью обеспечения; право собственности само по себе не подтверждает оценочную стоимость.",
+        "field": "collateral_value"
+      },
+      {
+        "code": "missing_document",
+        "message": "Контракт",
+        "suggestion": "Не подтверждено наличие читаемого документа: Контракт. Загрузите документ или уточните категорию уже загруженного файла."
+      },
+      {
+        "code": "missing_document",
+        "message": "Подтверждение права собственности на залог",
+        "suggestion": "Не подтверждено наличие читаемого документа: Подтверждение права собственности на залог. Загрузите документ или уточните категорию уже загруженного файла."
+      }
+    ],
+    "missing_documents": [
+      "Оценка обеспечения",
+      "Контракт",
+      "Подтверждение права собственности на залог"
+    ],
+    "recommendations": [
+      "Сверьте извлечённые показатели с указанными источниками; автоматическое извлечение не подтверждает подлинность документов."
+    ],
+    "documents_checked": 1,
+    "financial_analysis": {
+      "schema_version": 2,
+      "application": {
+        "application_id": "demo-125",
+        "document_version": 2,
+        "borrower_inn": "9900000017",
+        "loan_type": "contract",
+        "loan_amount_rub": null,
+        "term_months": null,
+        "annual_rate_percent": null,
+        "has_collateral": true,
+        "analysis_date": "2026-10-24"
+      },
+      "annual_model_input": {
+        "metrics": {
+          "revenue": 85000.0,
+          "net_profit_current": 4200.0,
+          "operating_profit_current": 5100.0,
+          "total_assets": 60000.0,
+          "equity": 22000.0,
+          "current_assets": 45000.0,
+          "short_term_liabilities": 35000.0,
+          "cash": 3800.0,
+          "receivables": 19000.0,
+          "okved_group": "47"
+        },
+        "unit": "RUB_THOUSANDS",
+        "currency": "RUB",
+        "period_start": "2025-01-01",
+        "period_end": "2025-12-31",
+        "as_of": "2025-12-31",
+        "ready": true,
+        "missing_fields": [],
+        "sources": {
+          "revenue": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.revenue",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "net_profit_current": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.net_profit_current",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "operating_profit_current": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.operating_profit_current",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "total_assets": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.total_assets",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "equity": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.equity",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "current_assets": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.current_assets",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "short_term_liabilities": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.short_term_liabilities",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "cash": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.cash",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "receivables": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.receivables",
+              "quote": "",
+              "is_mock": true
+            }
+          ],
+          "okved_group": [
+            {
+              "filename": null,
+              "provider": "mock-bo",
+              "locator": "metrics.okved_group",
+              "quote": "",
+              "is_mock": true
+            }
+          ]
+        }
+      },
+      "cash_flow": {
+        "unit": "RUB",
+        "currency": "RUB",
+        "months": [
+          {
+            "month": "2026-07",
+            "complete": true,
+            "unit": "RUB",
+            "accounts": [
+              "demo-account-1"
+            ],
+            "sources": [
+              {
+                "filename": "bank.csv",
+                "provider": null,
+                "locator": "CSV: операции 2026-07, счёт demo-account-1",
+                "quote": "transaction_id,account_id,date,direction,amount,currency,category,counterparty_id",
+                "is_mock": false
+              }
+            ],
+            "opening_balance": 10000000.0,
+            "closing_balance": 20300000.0,
+            "inflows": 16000000.0,
+            "outflows": 5700000.0,
+            "customer_receipts": 1000000.0,
+            "operating_payments": 500000.0,
+            "debt_service": 200000.0,
+            "customer_breakdown": {
+              "buyer-1": 1000000.0
+            }
+          },
+          {
+            "month": "2026-08",
+            "complete": true,
+            "unit": "RUB",
+            "accounts": [
+              "demo-account-1"
+            ],
+            "sources": [
+              {
+                "filename": "bank.csv",
+                "provider": null,
+                "locator": "CSV: операции 2026-08, счёт demo-account-1",
+                "quote": "transaction_id,account_id,date,direction,amount,currency,category,counterparty_id",
+                "is_mock": false
+              }
+            ],
+            "opening_balance": 20300000.0,
+            "closing_balance": 21300000.0,
+            "inflows": 2000000.0,
+            "outflows": 1000000.0,
+            "customer_receipts": 2000000.0,
+            "operating_payments": 800000.0,
+            "debt_service": 200000.0,
+            "customer_breakdown": {
+              "buyer-1": 2000000.0
+            }
+          },
+          {
+            "month": "2026-09",
+            "complete": true,
+            "unit": "RUB",
+            "accounts": [
+              "demo-account-1"
+            ],
+            "sources": [
+              {
+                "filename": "bank.csv",
+                "provider": null,
+                "locator": "CSV: операции 2026-09, счёт demo-account-1",
+                "quote": "transaction_id,account_id,date,direction,amount,currency,category,counterparty_id",
+                "is_mock": false
+              }
+            ],
+            "opening_balance": 21300000.0,
+            "closing_balance": 23100000.0,
+            "inflows": 3000000.0,
+            "outflows": 1200000.0,
+            "customer_receipts": 3000000.0,
+            "operating_payments": 1000000.0,
+            "debt_service": 200000.0,
+            "customer_breakdown": {
+              "buyer-1": 3000000.0
+            }
+          }
+        ],
+        "complete_months": 3,
+        "accounts_confirmed": true,
+        "average_monthly_inflows_rub": 7000000.0,
+        "average_monthly_outflows_rub": 2633333.33,
+        "average_month_end_balance_rub": 21566666.67,
+        "latest_observed_balance_rub": 23100000.0,
+        "latest_observed_balance_date": "2026-09-30"
+      },
+      "statistics": {
+        "current_ratio": {
+          "value": 1.285714,
+          "unit": "ratio",
+          "formula": "current_assets / short_term_liabilities",
+          "status": "available",
+          "reason": null,
+          "inputs": null,
+          "sources": []
+        },
+        "cash_ratio": {
+          "value": 0.108571,
+          "unit": "ratio",
+          "formula": "cash / short_term_liabilities",
+          "status": "available",
+          "reason": null,
+          "inputs": null,
+          "sources": []
+        },
+        "equity_to_assets": {
+          "value": 0.366667,
+          "unit": "ratio",
+          "formula": "equity / total_assets",
+          "status": "available",
+          "reason": null,
+          "inputs": null,
+          "sources": []
+        },
+        "net_margin": {
+          "value": 0.049412,
+          "unit": "ratio",
+          "formula": "net_profit_current / revenue",
+          "status": "available",
+          "reason": null,
+          "inputs": null,
+          "sources": []
+        },
+        "operating_margin": {
+          "value": 0.06,
+          "unit": "ratio",
+          "formula": "operating_profit_current / revenue",
+          "status": "available",
+          "reason": null,
+          "inputs": null,
+          "sources": []
+        },
+        "debt_to_ebitda": {
+          "value": null,
+          "unit": "ratio",
+          "formula": "total_debt / ebitda",
+          "status": "unavailable",
+          "reason": "Нет согласованных входов либо знаменатель неположительный",
+          "inputs": {
+            "total_debt_rub": null,
+            "ebitda_rub": null
+          },
+          "sources": []
+        },
+        "dscr": {
+          "value": null,
+          "unit": "ratio",
+          "formula": "cfads / debt_service_same_period",
+          "status": "unavailable",
+          "reason": "Нет согласованных входов либо знаменатель неположительный",
+          "inputs": {
+            "cfads_rub": null,
+            "debt_service_rub": null,
+            "period_start": "2025-01-01",
+            "period_end": "2025-12-31"
+          },
+          "sources": []
+        },
+        "collateral_value_rub": {
+          "value": null,
+          "unit": "RUB",
+          "formula": "latest sourced valuation",
+          "status": "unavailable",
+          "reason": "Нет согласованных входов либо знаменатель неположительный",
+          "inputs": null,
+          "sources": []
+        },
+        "largest_customer_receipts_share": {
+          "value": 1.0,
+          "unit": "ratio",
+          "formula": "largest counterparty customer receipts / all classified customer receipts",
+          "status": "available",
+          "reason": null,
+          "inputs": null,
+          "sources": []
+        }
+      },
+      "next_month_forecast": {
+        "ready": true,
+        "period": "2026-11",
+        "forecast_as_of": "2026-10-24",
+        "data_as_of": "2026-09-30",
+        "horizon_months_after_last_observation": 2,
+        "unit": "RUB",
+        "method": "mean_last_3_complete_consecutive_months",
+        "scenarios": [
+          {
+            "name": "base",
+            "assumptions": {
+              "receipts_factor": 1.0,
+              "operating_payments_factor": 1.0
+            },
+            "customer_receipts_rub": 2000000.0,
+            "operating_payments_rub": 766666.67,
+            "existing_debt_service_rub": 100000.0,
+            "proposed_credit_payment_rub": 200000.0,
+            "starting_observed_balance_rub": 23100000.0,
+            "opening_balance_rub": 24233333.33,
+            "balance_after_existing_debt_rub": 25366666.66,
+            "balance_after_all_debt_rub": 25166666.66,
+            "cash_gap_rub": 0.0,
+            "projection_path": [
+              {
+                "month": "2026-10",
+                "opening_balance_rub": 23100000.0,
+                "customer_receipts_rub": 2000000.0,
+                "operating_payments_rub": 766666.67,
+                "existing_debt_service_rub": 100000.0,
+                "proposed_credit_payment_rub": 0.0,
+                "closing_balance_rub": 24233333.33
+              },
+              {
+                "month": "2026-11",
+                "opening_balance_rub": 24233333.33,
+                "customer_receipts_rub": 2000000.0,
+                "operating_payments_rub": 766666.67,
+                "existing_debt_service_rub": 100000.0,
+                "proposed_credit_payment_rub": 200000.0,
+                "closing_balance_rub": 25166666.66
+              }
+            ]
+          },
+          {
+            "name": "cautious",
+            "assumptions": {
+              "receipts_factor": 0.9,
+              "operating_payments_factor": 1.1
+            },
+            "customer_receipts_rub": 1800000.0,
+            "operating_payments_rub": 843333.34,
+            "existing_debt_service_rub": 100000.0,
+            "proposed_credit_payment_rub": 200000.0,
+            "starting_observed_balance_rub": 23100000.0,
+            "opening_balance_rub": 23956666.66,
+            "balance_after_existing_debt_rub": 24813333.32,
+            "balance_after_all_debt_rub": 24613333.32,
+            "cash_gap_rub": 0.0,
+            "projection_path": [
+              {
+                "month": "2026-10",
+                "opening_balance_rub": 23100000.0,
+                "customer_receipts_rub": 1800000.0,
+                "operating_payments_rub": 843333.34,
+                "existing_debt_service_rub": 100000.0,
+                "proposed_credit_payment_rub": 0.0,
+                "closing_balance_rub": 23956666.66
+              },
+              {
+                "month": "2026-11",
+                "opening_balance_rub": 23956666.66,
+                "customer_receipts_rub": 1800000.0,
+                "operating_payments_rub": 843333.34,
+                "existing_debt_service_rub": 100000.0,
+                "proposed_credit_payment_rub": 200000.0,
+                "closing_balance_rub": 24613333.32
+              }
+            ]
+          },
+          {
+            "name": "stress",
+            "assumptions": {
+              "receipts_factor": 0.8,
+              "operating_payments_factor": 1.2
+            },
+            "customer_receipts_rub": 1600000.0,
+            "operating_payments_rub": 920000.0,
+            "existing_debt_service_rub": 100000.0,
+            "proposed_credit_payment_rub": 200000.0,
+            "starting_observed_balance_rub": 23100000.0,
+            "opening_balance_rub": 23680000.0,
+            "balance_after_existing_debt_rub": 24260000.0,
+            "balance_after_all_debt_rub": 24060000.0,
+            "cash_gap_rub": 0.0,
+            "projection_path": [
+              {
+                "month": "2026-10",
+                "opening_balance_rub": 23100000.0,
+                "customer_receipts_rub": 1600000.0,
+                "operating_payments_rub": 920000.0,
+                "existing_debt_service_rub": 100000.0,
+                "proposed_credit_payment_rub": 0.0,
+                "closing_balance_rub": 23680000.0
+              },
+              {
+                "month": "2026-11",
+                "opening_balance_rub": 23680000.0,
+                "customer_receipts_rub": 1600000.0,
+                "operating_payments_rub": 920000.0,
+                "existing_debt_service_rub": 100000.0,
+                "proposed_credit_payment_rub": 200000.0,
+                "closing_balance_rub": 24060000.0
+              }
+            ]
+          }
+        ],
+        "backtest": {
+          "folds": 0,
+          "mae_rub": null,
+          "mape_percent": null
+        },
+        "cash_gap_probability": null,
+        "confidence_interval": null,
+        "limitations": [
+          "Сценарии — заданные изменения ±10/20%, а не вероятности или доверительные интервалы",
+          "Учитываются поступления покупателей, операционные платежи и известные платежи по долгу; иные будущие потоки предполагаются нулевыми",
+          "До целевого месяца строится помесячный мост от последнего остатка; неполный текущий месяц не выдаётся за фактический. Платёж по новому кредиту применяется только в целевом месяце",
+          "Конечный месячный остаток не исключает внутримесячный кассовый разрыв",
+          "Банковские поступления не равны бухгалтерской выручке"
+        ]
+      },
+      "model_outputs": {
+        "status": "not_run",
+        "forecast_revenue_rub_thousands": null,
+        "safe_credit_limit_rub_thousands": null,
+        "net_margin_percent": null,
+        "operating_margin_percent": null,
+        "loss_probability_percent": null,
+        "liquidity_crisis_probability_percent": null,
+        "default_probability_percent": null,
+        "approval_probability_percent": null,
+        "risk_grade": null,
+        "decision": null,
+        "operating_cash_flow_forecast_rub": null,
+        "note": "Годовые модели запускаются отдельно по annual_model_input.metrics; вероятность убытка/дефицита ликвидности не является вероятностью дефолта или одобрения. Прогноз операционного потока требует собственной модели и истории."
+      },
+      "document_fields": [],
+      "client_requests": [
+        {
+          "code": "debt_to_ebitda_inputs_missing",
+          "title": "Данные для Долг/EBITDA",
+          "message": "Для долговой нагрузки нужны совокупный долг на отчётную дату и подтверждённый расчёт EBITDA за тот же год; прибыль от продаж не заменяет EBITDA.",
+          "fields": [
+            "total_debt",
+            "ebitda"
+          ],
+          "required_for": [
+            "debt_to_ebitda"
+          ],
+          "priority": "optional",
+          "action": "upload_or_clarify",
+          "filename": null
+        },
+        {
+          "code": "dscr_inputs_missing",
+          "title": "Данные для DSCR",
+          "message": "Для DSCR предоставьте денежный поток, доступный для обслуживания долга (CFADS), и полный график обслуживания долга за тот же период.",
+          "fields": [
+            "cfads",
+            "debt_service"
+          ],
+          "required_for": [
+            "dscr"
+          ],
+          "priority": "optional",
+          "action": "upload_or_clarify",
+          "filename": null
+        },
+        {
+          "code": "collateral_valuation_missing",
+          "title": "Оценка обеспечения",
+          "message": "Предоставьте оценочный отчёт с датой и стоимостью обеспечения; право собственности само по себе не подтверждает оценочную стоимость.",
+          "fields": [
+            "collateral_value"
+          ],
+          "required_for": [
+            "collateral_valuation"
+          ],
+          "priority": "required",
+          "action": "upload_or_clarify",
+          "filename": null
+        },
+        {
+          "code": "document_contract",
+          "title": "Контракт",
+          "message": "Не подтверждено наличие читаемого документа: Контракт. Загрузите документ или уточните категорию уже загруженного файла.",
+          "fields": [],
+          "required_for": [
+            "product_document_check"
+          ],
+          "priority": "required",
+          "action": "upload_or_clarify"
+        },
+        {
+          "code": "document_collateral_ownership",
+          "title": "Подтверждение права собственности на залог",
+          "message": "Не подтверждено наличие читаемого документа: Подтверждение права собственности на залог. Загрузите документ или уточните категорию уже загруженного файла.",
+          "fields": [],
+          "required_for": [
+            "product_document_check"
+          ],
+          "priority": "required",
+          "action": "upload_or_clarify"
+        }
+      ],
+      "employee_recommendations": [
+        {
+          "code": "verify_extraction",
+          "message": "Сверьте извлечённые показатели с указанными источниками; автоматическое извлечение не подтверждает подлинность документов."
+        }
+      ],
+      "warnings": [
+        {
+          "code": "seasonality_not_estimated",
+          "message": "Базовый прогноз не моделирует годовую сезонность; для её отдельной проверки нужна история минимум за 24 последовательных полных месяца",
+          "fields": []
+        },
+        {
+          "code": "mock_data",
+          "message": "В наборе есть демонстрационные данные; не использовать как реальные сведения клиента",
+          "fields": []
+        }
+      ],
+      "readiness": {
+        "annual_model": true,
+        "monthly_cash_flow": true,
+        "next_month_receipts_and_operating_payments": true,
+        "balance_after_all_debt": true,
+        "dscr": false,
+        "debt_to_ebitda": false,
+        "collateral_valuation": false
+      },
+      "is_mock": true
+    },
+    "processing": {
+      "started_at": "2026-10-24T18:16:31.384087+00:00",
+      "completed_at": "2026-10-24T18:16:31.385272+00:00",
+      "duration_ms": 1,
+      "files_received": 1,
+      "accepted_observations": 3,
+      "llm_chunks": 0
+    }
+  }
+}

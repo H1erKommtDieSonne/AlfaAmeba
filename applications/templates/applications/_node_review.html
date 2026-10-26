@@ -1,0 +1,23 @@
+{% if node_review %}
+<section class="panel" aria-labelledby="node-review-title">
+  <div class="panel__header">
+    <div>
+      <h2 id="node-review-title">Итог проверки внешнего узла</h2>
+      <p>Справочный результат отдельной проверки, не решение банка.</p>
+    </div>
+    <span class="status {{ node_review.tone }}">{{ node_review.label }}</span>
+  </div>
+  <div class="panel__body">
+    <p>{{ node_review.message }}</p>
+    {% if node_review.status == 'complete' %}
+      <p class="muted-copy">Завершение проверки комплектности не означает одобрение заявки и не подтверждает достоверность документов.</p>
+    {% elif node_review.status == 'processing_error' %}
+      <p class="muted-copy">Это техническая ошибка проверки, а не замечание к вашим документам. Автоматическая повторная отправка не выполняется.</p>
+    {% elif node_review.status == 'needs_documents' %}
+      <p class="muted-copy">Замечания к конкретным документам, если они переданы, указаны отдельно.</p>
+    {% elif node_review.status == 'needs_review' %}
+      <p class="muted-copy">Окончательное решение остаётся за сотрудником банка.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}

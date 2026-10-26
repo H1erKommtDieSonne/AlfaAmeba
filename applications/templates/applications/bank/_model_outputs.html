@@ -1,0 +1,17 @@
+<h3 class="side-heading">Расчёт ML-моделей</h3>
+{% if financial.model_outputs.run %}
+  <p class="source-line">Источник: {{ financial.model_outputs.source_label }}{% if financial.is_mock %} · демонстрационные данные{% endif %}</p>
+  <dl class="fact-list">
+    {% if financial.model_outputs.risk_grade %}<div><dt>Риск-грейд</dt><dd>{{ financial.model_outputs.risk_grade }}</dd></div>{% endif %}
+    {% for entry in financial.model_outputs.entries %}<div><dt>{{ entry.label }}</dt><dd>{{ entry.display }}</dd></div>{% endfor %}
+  </dl>
+  {% if financial.model_outputs.note %}<p class="muted-copy">{{ financial.model_outputs.note }}</p>{% endif %}
+  {% if financial.model_outputs.disclaimer %}<p class="muted-copy">{{ financial.model_outputs.disclaimer }}</p>{% endif %}
+{% elif financial.model_outputs.failed %}
+  <div class="review-note">{{ financial.model_outputs.note }}</div>
+{% elif financial.model_outputs.note %}
+  <p class="muted-copy">{{ financial.model_outputs.note }}</p>
+  {% if financial.model_outputs.disclaimer %}<p class="muted-copy">{{ financial.model_outputs.disclaimer }}</p>{% endif %}
+{% else %}
+  <p class="muted-copy">ML-модель ещё не запускалась. Риск-грейд, вероятности и безопасный лимит появятся после её расчёта по годовым показателям{% if financial.state == 'ready' and not financial.readiness.items.0.ready %} — для этого сначала нужны все годовые входы{% endif %}.</p>
+{% endif %}

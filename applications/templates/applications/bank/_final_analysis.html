@@ -1,0 +1,40 @@
+{% with final=financial.final_analysis %}
+  {% if final %}
+    <h3 class="side-heading{% if financial.state != 'ready' or not financial.highlights %} side-heading--first{% endif %}">Анализ финмодели</h3>
+    <p class="muted-copy">Нейросетевое заключение по типу и цели кредита, финансовым данным и прогнозам ML.</p>
+    {% if final.state == 'completed' %}
+      {% if final.summary %}<p class="muted-copy">{{ final.summary }}</p>{% endif %}
+      {% if final.key_points %}
+        <h4 class="side-heading">Ключевые пункты</h4>
+        <ul class="check-list">{% for item in final.key_points %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if final.risks %}
+        <h4 class="side-heading">Риски</h4>
+        <ul class="check-list">{% for item in final.risks %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if final.missing %}
+        <h4 class="side-heading">Чего не хватает</h4>
+        <ul class="check-list">{% for item in final.missing %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if final.conflicts %}
+        <h4 class="side-heading">Противоречия</h4>
+        <ul class="check-list">{% for item in final.conflicts %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if final.next_steps %}
+        <h4 class="side-heading">Следующие шаги</h4>
+        <ul class="check-list">{% for item in final.next_steps %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if final.limitations %}
+        <h4 class="side-heading">Ограничения</h4>
+        <ul class="check-list">{% for item in final.limitations %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      <p class="muted-copy">{{ final.disclaimer }}</p>
+      {% if final.is_mock %}<p class="source-line">Демонстрационный ответ нейросети: текст не получен от реальной модели.</p>{% endif %}
+      {% if final.provenance %}
+        <p class="source-line">Нейросеть: {{ final.provenance.model }}{% if final.provenance.prompt_version %} · {{ final.provenance.prompt_version }}{% endif %}{% if final.provenance.generated_at %} · {{ final.provenance.generated_at }}{% endif %}</p>
+      {% endif %}
+    {% else %}
+      <p class="muted-copy">{{ final.message }}</p>
+    {% endif %}
+  {% endif %}
+{% endwith %}

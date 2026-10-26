@@ -1,0 +1,7 @@
+{% if recalculation %}
+<div class="recalc-banner{% if recalculation.status == 'FAILED' or recalculation.status == 'UNCERTAIN' %} recalc-banner--warning{% endif %}" role="status">
+  <strong>{% if recalculation.status == 'PENDING' %}Пересчёт ждёт отправки узлу{% elif recalculation.status == 'SENDING' %}Пересчёт отправляется узлу{% elif recalculation.status == 'WAITING' %}Узел пересчитывает заявку{% elif recalculation.status == 'FAILED' %}Пересчёт не удался{% else %}Неизвестно, принял ли узел пересчёт{% endif %}</strong>
+  <span>Запросил {{ recalculation.requested_by.get_full_name|default:"сотрудник банка" }} · {{ recalculation.created_at|date:"d.m.Y H:i" }}. Ниже — прошлый результат узла{% if recalculation.status == 'FAILED' or recalculation.status == 'UNCERTAIN' %}; повторить пересчёт можно из блока «Данные для расчёта»{% else %}, страница не обновляется сама{% endif %}.</span>
+  {% if recalculation.last_error %}<small>{{ recalculation.last_error }}</small>{% endif %}
+</div>
+{% endif %}
